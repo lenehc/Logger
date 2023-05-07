@@ -9,7 +9,6 @@ from random import randint
 TITLE_PRINT_LIMIT = 38
 LOG_TABLE_HEADERS = 'log-id   date        time-span     page-span      depth'
 BOOK_TABLE_HEADERS = 'id       title'
-INSERT_LOG_QUERY = "INSERT INTO logs (id, book_id, date, time_start, time_end, page_start, page_end, depth) VALUES(?,?,?,?,?,?,?,?)"
 
         
 class ParseArgs():
@@ -60,30 +59,29 @@ class ParseArgs():
         '''
         parser = argparse.ArgumentParser(
             prog='logger',
-            epilog='expected log format: \'<date> <time-span> <page-span> <depth>\' (ex: \'2023-01-01 12:00-12:30 123-456 1\'), the depth value is numerical.',
-            allow_abbrev=False)
+            epilog='expected log format: \'<date> <time-span> <page-span> <depth>\' (ex: \'2023-01-01 12:00-12:30 123-456 1\'), the depth value is numerical.',)
 
         subparsers = parser.add_subparsers(dest='command', required=True)
 
-        add = subparsers.add_parser('add')
+        add = subparsers.add_parser('add', allow_abbrev=False)
         add_group = add.add_mutually_exclusive_group(required=True)
-        add_group.add_argument('--log', type=self._book_id)
-        add_group.add_argument('--book')
+        add_group.add_argument('-l', '--log', type=self._book_id)
+        add_group.add_argument('-b', '--book')
 
-        change = subparsers.add_parser('change')
+        change = subparsers.add_parser('change', allow_abbrev=False)
         change_group = change.add_mutually_exclusive_group(required=True)
-        change_group.add_argument('--log', type=self._log_id)
-        change_group.add_argument('--book', type=self._book_id)
+        change_group.add_argument('-l', '--log', type=self._log_id)
+        change_group.add_argument('-b', '--book', type=self._book_id)
 
-        delete = subparsers.add_parser('delete')
+        delete = subparsers.add_parser('delete', allow_abbrev=False)
         delete_group = delete.add_mutually_exclusive_group(required=True)
-        delete_group.add_argument('--log', type=self._log_id)
-        delete_group.add_argument('--book', type=self._book_id)
+        delete_group.add_argument('-l', '--log', type=self._log_id)
+        delete_group.add_argument('-b', '--book', type=self._book_id)
 
-        show = subparsers.add_parser('show')
+        show = subparsers.add_parser('show', allow_abbrev=False)
         show_group = show.add_mutually_exclusive_group(required=True)
-        show_group.add_argument('--log', type=self._log_id, nargs='?', const='all')
-        show_group.add_argument('--book', nargs='?', const='all', type=self._book_id)
+        show_group.add_argument('-l', '--log', type=self._log_id, nargs='?', const='all')
+        show_group.add_argument('-b', '--book', nargs='?', const='all', type=self._book_id)
 
         return parser.parse_args()
 
@@ -108,14 +106,17 @@ class Logger():
                 )''')
         
         self.cursor.execute('''CREATE TABLE IF NOT EXISTS logs (
-                    ID  INT  PRIMARY KEY,
-                    BOOK_ID  INT  NOT NULL,
-                    DATE  DATE  NOT NULL,
-                    TIME_START  TIME  NOT NULL,
-                    TIME_END  TIME  NOT NULL,
-                    PAGE_START  INT  NOT NULL,
-                    PAGE_END  INT  NOT NULL,
-                    DEPTH  INT  NOT NULL
+                    id  INT  PRIMARY KEY,
+                    book_id  INT  NOT NULL,
+                    date  DATE  NOT NULL,
+                    time_start  TIME  NOT NULL,
+                    time_end  TIME  NOT NULL,
+                    page_start  INT  NOT NULL,
+                    page_end  INT  NOT NULL,
+                    depth  INT  NOT NULL,
+                    CONSTRAINT log_fk
+                        FOREIGN KEY (book_id)
+                        REFERENCES books(id) ON DELETE CASCADE
                 )''')
         
     def _get_id(self, type):
@@ -170,7 +171,7 @@ class Logger():
         query = """
             SELECT books.title
             FROM logs
-            JOIN books ON logs.book_id = books.id
+            INNER JOIN books ON logs.book_id = books.id
             WHERE logs.id = ?
             """
         title = self.cursor.execute(query, (log_id,)).fetchone()[0]
@@ -265,7 +266,8 @@ class Logger():
                 logging.info(self._format_log(log_id[0]))
 
         else:
-            book_ids = self.cursor.execute("SELECT id FROM books ORDER BY title ASC").fetchall()
+            query = "SELECT id FROM books ORDER BY title ASC"
+            book_ids = self.cursor.execute(query).fetchall()
             logging.info(f'found {len(book_ids)} book(s).\n\n{BOOK_TABLE_HEADERS}')
 
             for book_id in book_ids:
@@ -287,8 +289,8 @@ class Logger():
 
         if self._confirm(f'(confirm insertion of log [Y/n]) '):
             id = int(str(self.args.log) + str(self._get_id('log')))
-            self.cursor.execute(INSERT_LOG_QUERY, (id, self.args.log, log[0], log[1][0], log[1][1], log[2][0], log[2][1], log[3]))
-            self.conn.commit()
+            query = "INSERT INTO logs (id, book_id, date, time_start, time_end, page_start, page_end, depth) VALUES(?,?,?,?,?,?,?,?)"
+            self.cursor.execute(query, (id, self.args.log, log[0], log[1][0], log[1][1], log[2][0], log[2][1], log[3]))
 
             logging.info(f'\n{LOG_TABLE_HEADERS}\n{self._format_log(id)}\n\ninserted log.')
             return
@@ -305,8 +307,8 @@ class Logger():
 
         if self._confirm(f'(confirm insertion [Y/n]) '):
             id = self._get_id('book')
-            self.cursor.execute("INSERT INTO books (id, title) VALUES(?,?)", (id, self.args.book))
-            self.conn.commit()
+            query = "INSERT INTO books (id, title) VALUES(?,?)"
+            self.cursor.execute(query, (id, self.args.book))
 
             logging.info(f'\n{BOOK_TABLE_HEADERS}\n{self._format_title(id)}\n\ninserted book.')
             return
@@ -329,9 +331,8 @@ class Logger():
             return
 
         if self._confirm(f'(confirm change [Y/n]) '):
-            self.cursor.execute("DELETE FROM logs WHERE id = ?", (self.args.log,))
-            self.cursor.execute(INSERT_LOG_QUERY, (self.args.log, int(str(self.args.log)[:3]), log[0], log[1][0], log[1][1], log[2][0], log[2][1], log[3]))
-            self.conn.commit()
+            query = "UPDATE logs SET date = ?, time_start = ?, time_end = ?, page_start = ?, page_end = ?, depth = ? WHERE log_id = ?"
+            self.cursor.execute(INSERT_LOG_QUERY, (log[0], log[1][0], log[1][1], log[2][0], log[2][1], log[3], self.args.log))
             logging.info(f'\n{self._format_log(self.args.log)}\n\nchanged log.')
             return
 
@@ -350,9 +351,8 @@ class Logger():
         new_title = input('(enter new title) ')
 
         if self._confirm(f'(confirm change [Y/n]) '):
-            self.cursor.execute("DELETE FROM books WHERE id = ?", (self.args.book,))
-            self.cursor.execute("INSERT INTO books (id, title) VALUES(?,?)", (self.args.book, new_title))
-            self.conn.commit()
+            query = "UPDATE books SET title = ? WHERE id = ?"
+            self.cursor.execute(query, (new_title, self.args.book))
 
             logging.info(f'\n{BOOK_TABLE_HEADERS}\n{self._format_title(self.args.book)}\n\nchanged book.')
             return
@@ -371,8 +371,8 @@ class Logger():
         logging.info(f'deleting log for \'{title}\'.\n\n{LOG_TABLE_HEADERS}\n{self._format_log(self.args.log)}')
 
         if self._confirm(f'\n(confirm deletion [Y/n]) '):
-            self.cursor.execute("DELETE FROM logs WHERE id = ?", (self.args.log,))
-            self.conn.commit()
+            query = "DELETE FROM logs WHERE id = ?"
+            self.cursor.execute(query, (self.args.log,))
 
             logging.info(f'\ndeleted log.')
             return
@@ -391,8 +391,8 @@ class Logger():
         logging.info(f'deleting \'{title}\' and {log_count} log(s).\n')
 
         if self._confirm(f'(confirm deletion [Y/n]) '):
-            self.cursor.execute("DELETE FROM books WHERE id = ?", (self.args.book,))
-            self.conn.commit()
+            query = "DELETE FROM books WHERE id = ?"
+            self.cursor.execute(query, (self.args.book,))
             logging.info(f'\ndeleted book.')
             return
 
@@ -466,6 +466,7 @@ def main():
     '''
     logging.basicConfig(format='%(message)s', level=logging.INFO)
     conn = sqlite3.Connection('.logger.db')
+    conn.execute("PRAGMA foreign_keys = 1")
     Logger(conn).run()
 
 
