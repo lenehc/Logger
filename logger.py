@@ -330,7 +330,7 @@ class Logger():
 
         if self._confirm(f'(confirm change [Y/n]) '):
             self.cursor.execute("DELETE FROM logs WHERE id = ?", (self.args.log,))
-            self.cursor.execute(INSERT_LOG_QUERY, (self.args.log, book_id, log[0], log[1][0], log[1][1], log[2][0], log[2][1], log[3]))
+            self.cursor.execute(INSERT_LOG_QUERY, (self.args.log, int(str(self.args.log)[:3]), log[0], log[1][0], log[1][1], log[2][0], log[2][1], log[3]))
             self.conn.commit()
             logging.info(f'\n{self._format_log(self.args.log)}\n\nchanged log.')
             return
