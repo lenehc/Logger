@@ -461,8 +461,8 @@ class Logger():
 
 def main():
     '''
-    Configure logging, instantiate a conection with the 'books.db'
-    file, and create a new 'Logger' instance.
+    Configure logging, connect to database and create a new 'Logger'
+    instance.
     '''
     logging.basicConfig(format='%(message)s', level=logging.INFO)
     conn = sqlite3.Connection('.logger.db')
