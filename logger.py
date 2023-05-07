@@ -6,9 +6,10 @@ from datetime import datetime
 from random import randint
 
 
-TITLE_PRINT_LIMIT = 35
-LOG_TABLE_HEADERS = 'log-id   date        time-span     page-span      intensity'
-INSERT_LOG_QUERY = "INSERT INTO logs (id, book_id, date, time_start, time_end, page_start, page_end, intensity) VALUES(?,?,?,?,?,?,?,?)"
+TITLE_PRINT_LIMIT = 38
+LOG_TABLE_HEADERS = 'log-id   date        time-span     page-span      depth'
+BOOK_TABLE_HEADERS = 'id       title'
+INSERT_LOG_QUERY = "INSERT INTO logs (id, book_id, date, time_start, time_end, page_start, page_end, depth) VALUES(?,?,?,?,?,?,?,?)"
 
         
 class ParseArgs():
@@ -59,7 +60,7 @@ class ParseArgs():
         '''
         parser = argparse.ArgumentParser(
             prog='logger',
-            epilog='expected log format: \'<date> <time-span> <page-span> <intensity>\' (ex:  \'2023-01-01 12:00-12:30 123-456 1\'), the intensity value is numerical.',
+            epilog='expected log format: \'<date> <time-span> <page-span> <depth>\' (ex: \'2023-01-01 12:00-12:30 123-456 1\'), the depth value is numerical.',
             allow_abbrev=False)
 
         subparsers = parser.add_subparsers(dest='command', required=True)
@@ -114,7 +115,7 @@ class Logger():
                     TIME_END  TIME  NOT NULL,
                     PAGE_START  INT  NOT NULL,
                     PAGE_END  INT  NOT NULL,
-                    INTENSITY  INT  NOT NULL
+                    DEPTH  INT  NOT NULL
                 )''')
         
     def _get_id(self, type):
@@ -149,14 +150,14 @@ class Logger():
             date = str(datetime.strptime(details[0], '%Y-%m-%d').date())
             time_start, time_end = (str(datetime.strptime(x, '%H:%M').time())[:-3] for x in details[1].split('-'))
             page_start, page_end = (abs(int(x)) for x in details[2].split('-'))
-            intensity = abs(int(details[3]))
+            depth = abs(int(details[3]))
 
             if time_start > time_end or page_start > page_end:
                 logging.error('\ninvalid log.')
 
                 return
 
-            return (date, (time_start,time_end), (page_start,page_end), intensity)
+            return (date, (time_start,time_end), (page_start,page_end), depth)
 
         except:
             logging.error('\ninvalid log.')
@@ -213,7 +214,7 @@ class Logger():
         log_count = self._get_log_count(book_id)
 
         title = (title[:TITLE_PRINT_LIMIT-2] + '..') if len(title) > TITLE_PRINT_LIMIT else title
-        base_str = f'{book_id}   {title.ljust(TITLE_PRINT_LIMIT)}' 
+        base_str = f'{book_id}      {title.ljust(TITLE_PRINT_LIMIT)}' 
         
         if log_count > 0:
             return f'{base_str}   [{log_count} log(s)]'
@@ -223,7 +224,7 @@ class Logger():
     def _format_log(self, log_id):
         '''
         Return a correctly formatted string containing a log's: id,
-        date, time-span, page-span and intensity, given a log-id.
+        date, time-span, page-span and depth, given a log-id.
         '''
         query = "SELECT * FROM logs WHERE id = ?"
         log = self.cursor.execute(query, (log_id,)).fetchone()
@@ -258,14 +259,14 @@ class Logger():
         if book_id:
             query = "SELECT id FROM logs WHERE book_id = ? ORDER BY date ASC"
             log_ids = self.cursor.execute(query, (book_id,)).fetchall()
-            logging.info(f'{self._format_title(book_id)}\n\n{LOG_TABLE_HEADERS}')
+            logging.info(f'{BOOK_TABLE_HEADERS}\n{self._format_title(book_id)}\n\n{LOG_TABLE_HEADERS}')
 
             for log_id in log_ids:
                 logging.info(self._format_log(log_id[0]))
 
         else:
             book_ids = self.cursor.execute("SELECT id FROM books ORDER BY title ASC").fetchall()
-            logging.info(f'found {len(book_ids)} book(s).\n')
+            logging.info(f'found {len(book_ids)} book(s).\n\n{BOOK_TABLE_HEADERS}')
 
             for book_id in book_ids:
                 logging.info(self._format_title(book_id[0]))
@@ -307,7 +308,7 @@ class Logger():
             self.cursor.execute("INSERT INTO books (id, title) VALUES(?,?)", (id, self.args.book))
             self.conn.commit()
 
-            logging.info(f'\n{self._format_title(id)}\n\ninserted book.')
+            logging.info(f'\n{BOOK_TABLE_HEADERS}\n{self._format_title(id)}\n\ninserted book.')
             return
 
         logging.info('\naborted.')
@@ -353,7 +354,7 @@ class Logger():
             self.cursor.execute("INSERT INTO books (id, title) VALUES(?,?)", (self.args.book, new_title))
             self.conn.commit()
 
-            logging.info(f'\n{self._format_title(self.args.book)}\n\nchanged book.')
+            logging.info(f'\n{BOOK_TABLE_HEADERS}\n{self._format_title(self.args.book)}\n\nchanged book.')
             return
 
         logging.info('\naborted.')
@@ -464,7 +465,7 @@ def main():
     file, and create a new 'Logger' instance.
     '''
     logging.basicConfig(format='%(message)s', level=logging.INFO)
-    conn = sqlite3.Connection('books.db')
+    conn = sqlite3.Connection('.logger.db')
     Logger(conn).run()
 
 
