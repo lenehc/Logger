@@ -72,7 +72,8 @@ class ParseArgs():
         '''
         parser = argparse.ArgumentParser(
             prog='logger',
-            epilog='expected log format: \'<date> <time-span> <page-span> <depth>\' (ex: \'2023-01-01 12:00-12:30 123-456 1\'), the depth value is numerical.',)
+            usage='logger [-h] <command> <options> [<args>]'
+            epilog='expected log format: \'<date> <time-span> <page-span> <depth>\' (ex: \'2023-01-01 12:00-12:30 123-456 1\'), depth value is numerical.',)
 
         subparsers = parser.add_subparsers(dest='command', required=True)
 
