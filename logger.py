@@ -6,11 +6,24 @@ from datetime import datetime
 from random import randint
 
 
-TITLE_PRINT_LIMIT = 38
-LOG_TABLE_HEADERS = 'log-id   date        time-span     page-span      depth'
-BOOK_TABLE_HEADERS = 'id       title'
+WIDTH = [6, 38, 15, 10]
 
-        
+def _FORMAT_STR(fields):
+    fmt_fields = []
+    for i,x in enumerate(fields):
+        colw = WIDTH[i]
+        if len(x) > colw:
+            x = f'{x[:colw-2]}..'
+        fmt_fields.append(x.ljust(colw))
+    return "   ".join(fmt_fields)
+
+LOG_TABLE_HEADERS = ['log-id', 'date         time-span', 'page-span', 'depth']
+BOOK_TABLE_HEADERS = ['id', 'title', 'tag', 'log-count']
+
+LOG_TABLE_HEADERS_STR = _FORMAT_STR(LOG_TABLE_HEADERS)
+BOOK_TABLE_HEADERS_STR = _FORMAT_STR(BOOK_TABLE_HEADERS)
+
+
 class ParseArgs():
     '''
     Main class for argument parsing.
@@ -83,6 +96,11 @@ class ParseArgs():
         show_group.add_argument('-l', '--log', type=self._log_id, nargs='?', const='all')
         show_group.add_argument('-b', '--book', nargs='?', const='all', type=self._book_id)
 
+        search = subparsers.add_parser('search', allow_abbrev=False)
+        search_group = search.add_mutually_exclusive_group(required=True)
+        search_group.add_argument('-t', '--title')
+        search_group.add_argument('-g', '--tag')
+
         return parser.parse_args()
 
 
@@ -101,8 +119,9 @@ class Logger():
         already exist.
         '''
         self.cursor.execute('''CREATE TABLE IF NOT EXISTS books (
-                    ID  INT  PRIMARY KEY,
-                    TITLE  TEXT
+                    id  INT  PRIMARY KEY,
+                    title  TEXT  NOT NULL,
+                    tag  TEXT
                 )''')
         
         self.cursor.execute('''CREATE TABLE IF NOT EXISTS logs (
@@ -211,16 +230,13 @@ class Logger():
         Return a correctly formatted string containing a book's title
         and id, given a book-id.
         '''
-        title = self._get_title_from_book_id(book_id)
+        query = "SELECT title, tag FROM books WHERE id = ?"
+        title, tag = self.cursor.execute(query, (book_id,)).fetchone()
         log_count = self._get_log_count(book_id)
 
-        title = (title[:TITLE_PRINT_LIMIT-2] + '..') if len(title) > TITLE_PRINT_LIMIT else title
-        base_str = f'{book_id}      {title.ljust(TITLE_PRINT_LIMIT)}' 
-        
-        if log_count > 0:
-            return f'{base_str}   [{log_count} log(s)]'
+        fields = [str(book_id), title, tag, str(log_count)]
 
-        return base_str
+        return _FORMAT_STR(fields)
 
     def _format_log(self, log_id):
         '''
@@ -230,10 +246,12 @@ class Logger():
         query = "SELECT * FROM logs WHERE id = ?"
         log = self.cursor.execute(query, (log_id,)).fetchone()
 
-        time_span = f'{log[3]}-{log[4]}'
         page_span = f'{log[5]}-{log[6]}'
+        date_time = f'{log[2]}   {log[3]}-{log[4]}'
 
-        return f'{log[0]}   {log[2]}  {time_span}   pp.{page_span.ljust(9)}   {log[7]}'
+        fields = [str(log_id), date_time, f'pp.{page_span}', str(log[7])]
+
+        return _FORMAT_STR(fields)
                 
     def print_log(self, log_id=None):
         '''
@@ -242,25 +260,25 @@ class Logger():
         '''
         if log_id:
             title = self._get_title_from_log_id(log_id)
-            logging.info(f'log for \'{title}\'.\n\n{LOG_TABLE_HEADERS}\n{self._format_log(log_id)}')
+            logging.info(f'log for \'{title}\'.\n\n{LOG_TABLE_HEADERS_STR}\n{self._format_log(log_id)}')
 
         else:
             query = "SELECT id FROM logs ORDER BY date ASC"
             log_ids = self.cursor.execute(query).fetchall()
-            logging.info(f'found {len(log_ids)} log(s).\n\n{LOG_TABLE_HEADERS}')
+            logging.info(f'found {len(log_ids)} log(s).\n\n{LOG_TABLE_HEADERS_STR}')
 
             for log_id in log_ids:
                 logging.info(self._format_log(log_id[0]))
 
     def print_book(self, book_id=None):
         '''
-        Print a book's:  information and all corresponding logs,
+        Print a book's: information and all corresponding logs,
         otherwise print all books.
         '''
         if book_id:
             query = "SELECT id FROM logs WHERE book_id = ? ORDER BY date ASC"
             log_ids = self.cursor.execute(query, (book_id,)).fetchall()
-            logging.info(f'{BOOK_TABLE_HEADERS}\n{self._format_title(book_id)}\n\n{LOG_TABLE_HEADERS}')
+            logging.info(f'{BOOK_TABLE_HEADERS_STR}\n{self._format_title(book_id)}\n\n{LOG_TABLE_HEADERS_STR}')
 
             for log_id in log_ids:
                 logging.info(self._format_log(log_id[0]))
@@ -268,7 +286,7 @@ class Logger():
         else:
             query = "SELECT id FROM books ORDER BY title ASC"
             book_ids = self.cursor.execute(query).fetchall()
-            logging.info(f'found {len(book_ids)} book(s).\n\n{BOOK_TABLE_HEADERS}')
+            logging.info(f'found {len(book_ids)} book(s).\n\n{BOOK_TABLE_HEADERS_STR}')
 
             for book_id in book_ids:
                 logging.info(self._format_title(book_id[0]))
@@ -292,7 +310,7 @@ class Logger():
             query = "INSERT INTO logs (id, book_id, date, time_start, time_end, page_start, page_end, depth) VALUES(?,?,?,?,?,?,?,?)"
             self.cursor.execute(query, (id, self.args.log, log[0], log[1][0], log[1][1], log[2][0], log[2][1], log[3]))
 
-            logging.info(f'\n{LOG_TABLE_HEADERS}\n{self._format_log(id)}\n\ninserted log.')
+            logging.info(f'\n{LOG_TABLE_HEADERS_STR}\n{self._format_log(id)}\n\ninserted log.')
             return
 
         logging.info('\naborted.')
@@ -305,12 +323,14 @@ class Logger():
         '''
         logging.info(f'inserting \'{self.args.book}\'.\n')
 
+        tag = input('(enter tag) ')
+
         if self._confirm(f'(confirm insertion [Y/n]) '):
             id = self._get_id('book')
-            query = "INSERT INTO books (id, title) VALUES(?,?)"
-            self.cursor.execute(query, (id, self.args.book))
+            query = "INSERT INTO books (id, title, tag) VALUES(?,?,?)"
+            self.cursor.execute(query, (id, self.args.book, tag))
 
-            logging.info(f'\n{BOOK_TABLE_HEADERS}\n{self._format_title(id)}\n\ninserted book.')
+            logging.info(f'\n{BOOK_TABLE_HEADERS_STR}\n{self._format_title(id)}\n\ninserted book.')
             return
 
         logging.info('\naborted.')
@@ -323,14 +343,14 @@ class Logger():
         '''
         title = self._get_title_from_log_id(self.args.log)
 
-        logging.info(f'changing log for \'{title}\'.\n\n{LOG_TABLE_HEADERS}\n{self._format_log(self.args.log)}\n')
+        logging.info(f'changing log for \'{title}\'.\n\n{LOG_TABLE_HEADERS_STR}\n{self._format_log(self.args.log)}\n')
 
         log = self._get_log('(enter new log) ')
 
         if not log:
             return
 
-        if self._confirm(f'(confirm change [Y/n]) '):
+        if self._confirm(f'(confirm changes [Y/n]) '):
             query = "UPDATE logs SET date = ?, time_start = ?, time_end = ?, page_start = ?, page_end = ?, depth = ? WHERE log_id = ?"
             self.cursor.execute(INSERT_LOG_QUERY, (log[0], log[1][0], log[1][1], log[2][0], log[2][1], log[3], self.args.log))
             logging.info(f'\n{self._format_log(self.args.log)}\n\nchanged log.')
@@ -349,12 +369,13 @@ class Logger():
         logging.info(f'changing \'{title}\'.\n')
 
         new_title = input('(enter new title) ')
+        new_tag = input('(enter new tag) ')
 
-        if self._confirm(f'(confirm change [Y/n]) '):
-            query = "UPDATE books SET title = ? WHERE id = ?"
-            self.cursor.execute(query, (new_title, self.args.book))
+        if self._confirm(f'(confirm changes [Y/n]) '):
+            query = "UPDATE books SET title = ?, tag = ? WHERE id = ?"
+            self.cursor.execute(query, (new_title, new_tag, self.args.book))
 
-            logging.info(f'\n{BOOK_TABLE_HEADERS}\n{self._format_title(self.args.book)}\n\nchanged book.')
+            logging.info(f'\n{BOOK_TABLE_HEADERS_STR}\n{self._format_title(self.args.book)}\n\nchanged book.')
             return
 
         logging.info('\naborted.')
@@ -368,7 +389,7 @@ class Logger():
         '''
         title = self._get_title_from_log_id(self.args.log)
 
-        logging.info(f'deleting log for \'{title}\'.\n\n{LOG_TABLE_HEADERS}\n{self._format_log(self.args.log)}')
+        logging.info(f'deleting log for \'{title}\'.\n\n{LOG_TABLE_HEADERS_STR}\n{self._format_log(self.args.log)}')
 
         if self._confirm(f'\n(confirm deletion [Y/n]) '):
             query = "DELETE FROM logs WHERE id = ?"
@@ -423,6 +444,25 @@ class Logger():
         self.print_book(self.args.book)
         return
     
+    def search_title(self):
+        query = f"SELECT id FROM books WHERE title LIKE '%' || ? || '%'"
+        results = self.cursor.execute(query, (self.args.title,)).fetchall()
+
+        logging.info(f'{len(results)} result(s) for title \'{self.args.title}\'.\n\n{BOOK_TABLE_HEADERS_STR}')
+
+        for book in results:
+            logging.info(self._format_title(book[0]))
+
+    def search_tag(self):
+        query = f"SELECT id FROM books WHERE tag LIKE '%' || ? || '%'"
+        results = self.cursor.execute(query, (self.args.tag,)).fetchall()
+
+        logging.info(f'{len(results)} result(s) for tag \'{self.args.tag}\'.\n\n{BOOK_TABLE_HEADERS_STR}')
+
+        for book in results:
+            logging.info(self._format_title(book[0]))
+
+   
     def run(self):
         '''
         Run the logging process.
@@ -457,6 +497,14 @@ class Logger():
 
                 elif self.args.book:
                     self.show_book()
+
+            elif self.args.command == 'search':
+                if self.args.title:
+                    self.search_title()
+
+                elif self.args.tag:
+                    self.search_tag()
+
 
 
 def main():
