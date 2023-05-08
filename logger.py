@@ -6,22 +6,26 @@ from datetime import datetime
 from random import randint
 
 
-WIDTH = [6, 38, 15, 10]
+WIDTH_BOOK = [6, 38, 15, 15]
+WIDTH_LOG = [6, 14, 21, 15, 15]
+WIDTH_ALT = [23, 21, 15, 15]
 
-def _FORMAT_STR(fields):
+def _FORMAT_STR(fields, width):
     fmt_fields = []
     for i,x in enumerate(fields):
-        colw = WIDTH[i]
+        colw = width[i]
         if len(x) > colw:
             x = f'{x[:colw-2]}..'
         fmt_fields.append(x.ljust(colw))
     return "   ".join(fmt_fields)
 
-LOG_TABLE_HEADERS = ['log-id', 'date         time-span', 'page-span', 'depth']
-BOOK_TABLE_HEADERS = ['id', 'title', 'tag', 'log-count']
+LOG_TABLE_HEADERS = ['ID', 'Date', 'Time', 'Pages', 'Depth']
+BOOK_TABLE_HEADERS = ['ID', 'Title', 'Tag', 'Logs']
+BOOK_EXPAND_TABLE_HEADERS = ['First Read', 'Total Time', 'Total Pages', 'Average Depth']
 
-LOG_TABLE_HEADERS_STR = _FORMAT_STR(LOG_TABLE_HEADERS)
-BOOK_TABLE_HEADERS_STR = _FORMAT_STR(BOOK_TABLE_HEADERS)
+LOG_TABLE_HEADERS_STR = _FORMAT_STR(LOG_TABLE_HEADERS, WIDTH_LOG)
+BOOK_TABLE_HEADERS_STR = _FORMAT_STR(BOOK_TABLE_HEADERS, WIDTH_BOOK)
+BOOK_EXPAND_TABLE_HEADERS_STR = _FORMAT_STR(BOOK_EXPAND_TABLE_HEADERS, WIDTH_ALT)
 
 
 class ParseArgs():
@@ -72,7 +76,6 @@ class ParseArgs():
         '''
         parser = argparse.ArgumentParser(
             prog='logger',
-            usage='logger [-h] <command> <options> [<args>]',
             epilog='expected log format: \'<date> <time-span> <page-span> <depth>\' (ex: \'2023-01-01 12:00-12:30 123-456 1\'), depth value is numerical.')
 
         subparsers = parser.add_subparsers(dest='command', required=True)
@@ -156,33 +159,48 @@ class Logger():
             if not self.cursor.execute(query, (id,)).fetchone():
                 return id
 
-    def _get_log(self, prompt):
+    def _get_log(self):
         '''
         Prompt user for log and report invalid entries.
         '''
-        log = input(prompt)
-        details = log.split()
-
-        if len(details) != 4:
-            logging.error('\ninvalid log.')
+        try:
+            date = input('(Enter date) ')
+            date = str(datetime.strptime(date, '%Y-%m-%d').date())
+        except:
+            logging.error('\nInvalid date, expected \'YYYY-MM-DD\'')
             return
 
         try:
-            date = str(datetime.strptime(details[0], '%Y-%m-%d').date())
-            time_start, time_end = (str(datetime.strptime(x, '%H:%M').time())[:-3] for x in details[1].split('-'))
-            page_start, page_end = (abs(int(x)) for x in details[2].split('-'))
-            depth = abs(int(details[3]))
-
-            if time_start > time_end or page_start > page_end:
-                logging.error('\ninvalid log.')
-
+            timespan = input('(Enter timespan) ')
+            time_start, time_end = (str(datetime.strptime(x, '%H:%M').time())[:-3] for x in timespan.split('-'))
+            if time_start > time_end:
+                logging.error('\nInvalid time, expected \'HH:MM-HH:MM\'')
                 return
-
-            return (date, (time_start,time_end), (page_start,page_end), depth)
-
         except:
-            logging.error('\ninvalid log.')
+            logging.error('\nInvalid time, expected \'HH:MM-HH:MM\'')
             return
+
+        try:
+            pages = input('(Enter pages) ')
+            page_start, page_end = (abs(int(x)) for x in pages.split('-'))
+            if page_start > page_end:
+                logging.error('\nInvalid pages, expected \'P-P\'')
+                return
+        except: 
+            logging.error('\nInvalid pages, expected \'P-P\'')
+            return
+
+        try:
+            depth = input('(Enter depth) ')
+            depth = abs(int(depth))
+            if depth > 4:
+                logging.error('\nInvalid pages, expected value in range 4')
+                return
+        except:
+            logging.error('\nInvalid pages, expected value in range 4')
+            return
+
+        return (date, (time_start,time_end), (page_start,page_end), depth)
             
     def _get_title_from_log_id(self, log_id):
         '''
@@ -205,12 +223,18 @@ class Logger():
         title = self.cursor.execute(query, (book_id,)).fetchone()[0]
         return title
             
-    def _get_log_count(self, book_id):
+    def _get_log_count(self, book_id=None):
         '''
         Fetch the total number of logs associated, given a book-id.
         '''
-        query = "SELECT COUNT(*) FROM logs WHERE book_id = ?"
-        log_count = self.cursor.execute(query, (book_id,)).fetchone()[0]
+        if book_id:
+            query = "SELECT COUNT(*) FROM logs WHERE book_id = ?"
+            log_count = self.cursor.execute(query, (book_id,)).fetchone()[0]
+
+        else:
+            query = "SELECT COUNT(*) FROM logs"
+            log_count = self.cursor.execute(query).fetchone()[0]
+
         return log_count
  
     def _confirm(self, prompt):
@@ -218,15 +242,61 @@ class Logger():
         Loop until user responds with 'y' or 'n', return the
         corresponding boolean value.
         '''
-        valid_responses = {'y', 'n'}
-        
+        valid_responses = {'y', 'n', 'yes', 'no'}
+
         while True:
             conf = input(prompt).lower()
 
             if conf in valid_responses:
-                return conf == 'y'
+                return conf == 'y' or conf == 'yes'
  
-    def _format_title(self, book_id):
+    def _expand_date(self, date):
+        return datetime.strptime(date, '%Y-%m-%d').strftime('%d %b %Y')
+            
+    def _format_book_expand(self, book_id):
+        if not self.cursor.execute("SELECT EXISTS (SELECT 1 FROM logs WHERE book_id = ?)", (book_id,)).fetchone()[0]:
+            return
+        
+        first_read_query = "SELECT date FROM logs WHERE book_id = ? ORDER BY date ASC LIMIT 1"
+        first_read_row = self.cursor.execute(first_read_query, (book_id,)).fetchone()[0]
+
+        total_time_query = "SELECT time_start, time_end FROM logs WHERE book_id = ?"
+        time_rows = self.cursor.execute(total_time_query, (book_id,)).fetchall()
+
+        total_pages_query = "SELECT page_start, page_end FROM logs WHERE book_id = ?"
+        page_rows = self.cursor.execute(total_pages_query, (book_id,)).fetchall()
+
+        average_depth_query = "SELECT depth FROM logs WHERE book_id = ?"
+        depth_rows = self.cursor.execute(average_depth_query, (book_id,)).fetchall()
+
+        title = self._get_title_from_book_id(book_id)
+        log_count = self._get_log_count(book_id)
+        first_read = self._expand_date(first_read_row)
+        total_time = 0
+        total_pages = 0
+        average_depth = 0
+
+        lgth_str = 'log' if log_count == 1 else 'logs'
+        subtitle = f'ID {book_id} - {log_count} {lgth_str}'
+
+        for row in time_rows:
+            start = datetime.strptime(row[0], '%H:%M')
+            end = datetime.strptime(row[1], '%H:%M')
+            total_time += (end-start).total_seconds()
+
+        for row in page_rows:
+            total_pages += row[1] - row[0]
+
+        for row in depth_rows:
+            average_depth += row[0]
+
+        average_depth = int(average_depth/len(depth_rows))
+
+
+
+        return _FORMAT_STR([str(first_read), str(total_time), str(total_pages), str(average_depth)], WIDTH_ALT)
+            
+    def _format_book(self, book_id):
         '''
         Return a correctly formatted string containing a book's title
         and id, given a book-id.
@@ -235,9 +305,16 @@ class Logger():
         title, tag = self.cursor.execute(query, (book_id,)).fetchone()
         log_count = self._get_log_count(book_id)
 
+        if log_count == 0:
+            log_count = '--'
+
+        if tag == '':
+            tag = '--'
+
+
         fields = [str(book_id), title, tag, str(log_count)]
 
-        return _FORMAT_STR(fields)
+        return _FORMAT_STR(fields, WIDTH_BOOK)
 
     def _format_log(self, log_id):
         '''
@@ -247,12 +324,14 @@ class Logger():
         query = "SELECT * FROM logs WHERE id = ?"
         log = self.cursor.execute(query, (log_id,)).fetchone()
 
-        page_span = f'{log[5]}-{log[6]}'
-        date_time = f'{log[2]}   {log[3]}-{log[4]}'
+        date = self._expand_date(log[2])
+        page_span = f'{log[5]} to {log[6]}'
+        time_span = f'{log[3]} to {log[4]}'
 
-        fields = [str(log_id), date_time, f'pp.{page_span}', str(log[7])]
 
-        return _FORMAT_STR(fields)
+        fields = [str(log_id), date, time_span, page_span, str(log[7])]
+
+        return _FORMAT_STR(fields, WIDTH_LOG)
                 
     def print_log(self, log_id=None):
         '''
@@ -261,15 +340,24 @@ class Logger():
         '''
         if log_id:
             title = self._get_title_from_log_id(log_id)
-            logging.info(f'log for \'{title}\'.\n\n{LOG_TABLE_HEADERS_STR}\n{self._format_log(log_id)}')
+            logging.info(f'Log for \'{title}\'\n\n{LOG_TABLE_HEADERS_STR}\n{self._format_log(log_id)}')
 
         else:
-            query = "SELECT id FROM logs ORDER BY date ASC"
+            query = "SELECT id FROM logs ORDER BY date DESC"
+            count_query = "SELECT COUNT(DISTINCT book_id) FROM logs"
             log_ids = self.cursor.execute(query).fetchall()
-            logging.info(f'found {len(log_ids)} log(s).\n\n{LOG_TABLE_HEADERS_STR}')
+            book_count = self.cursor.execute(count_query).fetchone()[0]
+            logging.info(LOG_TABLE_HEADERS_STR)
 
             for log_id in log_ids:
                 logging.info(self._format_log(log_id[0]))
+
+
+            lgth = len(log_ids)
+            lstr = 'log' if lgth == 1 else 'logs'
+            bstr = 'book' if book_count == 1 else 'books'
+                
+            logging.info(f'\n{lgth} {lstr}, {book_count} {bstr}')
 
     def print_book(self, book_id=None):
         '''
@@ -277,9 +365,20 @@ class Logger():
         otherwise print all books.
         '''
         if book_id:
-            query = "SELECT id FROM logs WHERE book_id = ? ORDER BY date ASC"
+            query = "SELECT id FROM logs WHERE book_id = ? ORDER BY date DESC"
             log_ids = self.cursor.execute(query, (book_id,)).fetchall()
-            logging.info(f'{BOOK_TABLE_HEADERS_STR}\n{self._format_title(book_id)}\n\n{LOG_TABLE_HEADERS_STR}')
+            title = self._get_title_from_book_id(book_id)
+            log_count = self._get_log_count(book_id)
+            str = 'log' if log_count == 1 else 'logs'
+
+            logging.info(f'{title}\nID {book_id} - {log_count} {str}\n\n{BOOK_EXPAND_TABLE_HEADERS_STR}')
+
+            expand_book = self._format_book_expand(book_id)
+
+            if expand_book:
+                logging.info(expand_book)
+            
+            logging.info(f'\n{LOG_TABLE_HEADERS_STR}')
 
             for log_id in log_ids:
                 logging.info(self._format_log(log_id[0]))
@@ -287,10 +386,18 @@ class Logger():
         else:
             query = "SELECT id FROM books ORDER BY title ASC"
             book_ids = self.cursor.execute(query).fetchall()
-            logging.info(f'found {len(book_ids)} book(s).\n\n{BOOK_TABLE_HEADERS_STR}')
+            logging.info(BOOK_TABLE_HEADERS_STR)
 
             for book_id in book_ids:
-                logging.info(self._format_title(book_id[0]))
+                logging.info(self._format_book(book_id[0]))
+
+
+            llgth = self._get_log_count()
+            blgth = len(book_ids)
+            lstr = 'log' if llgth == 1 else 'logs'
+            bstr = 'book' if blgth == 1 else 'books'
+                
+            logging.info(f'\n{blgth} {bstr}, {llgth} {lstr}')
        
     def add_log(self):
         '''
@@ -299,22 +406,22 @@ class Logger():
         '''
         title = self._get_title_from_book_id(self.args.log)
 
-        logging.info(f'inserting log for \'{title}\'.\n')
+        logging.info(f'Insert log for \'{title}\'\n')
 
-        log = self._get_log('(enter log) ')
+        log = self._get_log()
 
         if not log:
             return
 
-        if self._confirm(f'(confirm insertion of log [Y/n]) '):
+        if self._confirm(f'(Confirm insertion of log?) '):
             id = int(str(self.args.log) + str(self._get_id('log')))
             query = "INSERT INTO logs (id, book_id, date, time_start, time_end, page_start, page_end, depth) VALUES(?,?,?,?,?,?,?,?)"
             self.cursor.execute(query, (id, self.args.log, log[0], log[1][0], log[1][1], log[2][0], log[2][1], log[3]))
 
-            logging.info(f'\n{LOG_TABLE_HEADERS_STR}\n{self._format_log(id)}\n\ninserted log.')
+            logging.info(f'\n{LOG_TABLE_HEADERS_STR}\n{self._format_log(id)}\n\nInserted log')
             return
 
-        logging.info('\naborted.')
+        logging.info('\nAborted')
         return
    
     def add_book(self):
@@ -322,19 +429,19 @@ class Logger():
         Prompt the user for confirmation of book insertion, and insert
         into the database accordingly. 
         '''
-        logging.info(f'inserting \'{self.args.book}\'.\n')
+        logging.info(f'Insert \'{self.args.book}\'\n')
 
-        tag = input('(enter tag) ')
+        tag = input('(Enter tag) ')
 
-        if self._confirm(f'(confirm insertion [Y/n]) '):
+        if self._confirm(f'(Confirm insertion?) '):
             id = self._get_id('book')
             query = "INSERT INTO books (id, title, tag) VALUES(?,?,?)"
             self.cursor.execute(query, (id, self.args.book, tag))
 
-            logging.info(f'\n{BOOK_TABLE_HEADERS_STR}\n{self._format_title(id)}\n\ninserted book.')
+            logging.info('\nInserted book')
             return
 
-        logging.info('\naborted.')
+        logging.info('\nAborted')
         return
     
     def change_log(self):
@@ -344,20 +451,20 @@ class Logger():
         '''
         title = self._get_title_from_log_id(self.args.log)
 
-        logging.info(f'changing log for \'{title}\'.\n\n{LOG_TABLE_HEADERS_STR}\n{self._format_log(self.args.log)}\n')
+        logging.info(f'Change log for \'{title}\'\n\n{LOG_TABLE_HEADERS_STR}\n{self._format_log(self.args.log)}\n')
 
-        log = self._get_log('(enter new log) ')
+        log = self._get_log()
 
         if not log:
             return
 
-        if self._confirm(f'(confirm changes [Y/n]) '):
+        if self._confirm(f'(Confirm changes?) '):
             query = "UPDATE logs SET date = ?, time_start = ?, time_end = ?, page_start = ?, page_end = ?, depth = ? WHERE log_id = ?"
             self.cursor.execute(INSERT_LOG_QUERY, (log[0], log[1][0], log[1][1], log[2][0], log[2][1], log[3], self.args.log))
-            logging.info(f'\n{self._format_log(self.args.log)}\n\nchanged log.')
+            logging.info(f'\n{self._format_log(self.args.log)}\n\nChanged log')
             return
 
-        logging.info('\naborted.')
+        logging.info('\nAborted')
         return
 
     def change_book(self):
@@ -367,19 +474,19 @@ class Logger():
         '''
         title = self._get_title_from_book_id(self.args.book)
         
-        logging.info(f'changing \'{title}\'.\n')
+        logging.info(f'Change \'{title}\'\n')
 
-        new_title = input('(enter new title) ')
-        new_tag = input('(enter new tag) ')
+        new_title = input('(Enter new title) ')
+        new_tag = input('(Enter new tag) ')
 
-        if self._confirm(f'(confirm changes [Y/n]) '):
+        if self._confirm(f'(Confirm changes?) '):
             query = "UPDATE books SET title = ?, tag = ? WHERE id = ?"
             self.cursor.execute(query, (new_title, new_tag, self.args.book))
 
-            logging.info(f'\n{BOOK_TABLE_HEADERS_STR}\n{self._format_title(self.args.book)}\n\nchanged book.')
+            logging.info(f'\n{BOOK_TABLE_HEADERS_STR}\n{self._format_book(self.args.book)}\n\nChanged book')
             return
 
-        logging.info('\naborted.')
+        logging.info('\nAborted')
         return
         
     
@@ -390,16 +497,16 @@ class Logger():
         '''
         title = self._get_title_from_log_id(self.args.log)
 
-        logging.info(f'deleting log for \'{title}\'.\n\n{LOG_TABLE_HEADERS_STR}\n{self._format_log(self.args.log)}')
+        logging.info(f'Delete log for \'{title}\'\n\n{LOG_TABLE_HEADERS_STR}\n{self._format_log(self.args.log)}\n')
 
-        if self._confirm(f'\n(confirm deletion [Y/n]) '):
+        if self._confirm(f'(Confirm deletion?) '):
             query = "DELETE FROM logs WHERE id = ?"
             self.cursor.execute(query, (self.args.log,))
 
-            logging.info(f'\ndeleted log.')
+            logging.info(f'\nDeleted log')
             return
 
-        logging.info('\naborted.')
+        logging.info('\nAborted')
         return
 
     def delete_book(self):
@@ -410,15 +517,17 @@ class Logger():
         title = self._get_title_from_book_id(self.args.book)
         log_count = self._get_log_count(self.args.book)
 
-        logging.info(f'deleting \'{title}\' and {log_count} log(s).\n')
+        str = 'log' if log_count == 1 else 'logs' 
 
-        if self._confirm(f'(confirm deletion [Y/n]) '):
+        logging.info(f'Delete \'{title}\' and {log_count} {str}\n')
+
+        if self._confirm(f'(Confirm deletion?) '):
             query = "DELETE FROM books WHERE id = ?"
             self.cursor.execute(query, (self.args.book,))
-            logging.info(f'\ndeleted book.')
+            logging.info(f'\nDeleted book')
             return
 
-        logging.info('\naborted.')
+        logging.info('\nAborted')
         return
     
     def show_log(self):
@@ -449,20 +558,25 @@ class Logger():
         query = f"SELECT id FROM books WHERE title LIKE '%' || ? || '%'"
         results = self.cursor.execute(query, (self.args.title,)).fetchall()
 
-        logging.info(f'{len(results)} result(s) for title \'{self.args.title}\'.\n\n{BOOK_TABLE_HEADERS_STR}')
+        lgth = len(results)
+        str = 'result' if lgth == 1 else 'results'
+        
+        logging.info(f'{lgth} {str} for title \'{self.args.title}\'\n\n{BOOK_TABLE_HEADERS_STR}')
 
         for book in results:
-            logging.info(self._format_title(book[0]))
+            logging.info(self._format_book(book[0]))
 
     def search_tag(self):
         query = f"SELECT id FROM books WHERE tag LIKE '%' || ? || '%'"
         results = self.cursor.execute(query, (self.args.tag,)).fetchall()
 
-        logging.info(f'{len(results)} result(s) for tag \'{self.args.tag}\'.\n\n{BOOK_TABLE_HEADERS_STR}')
+        lgth = len(results)
+        str = 'result' if lgth == 1 else 'results'
+
+        logging.info(f'{lgth} {str} for tag \'{self.args.tag}\'\n\n{BOOK_TABLE_HEADERS_STR}')
 
         for book in results:
-            logging.info(self._format_title(book[0]))
-
+            logging.info(self._format_book(book[0]))
    
     def run(self):
         '''
