@@ -3,9 +3,9 @@ Logger.py is a simple CLI-based reading logger allowing you to keep logs of hour
 
 ## Usage
 ```
-logger <command> <args>
+logger.py <command> <args>
 ```
 For details, run:
 ```
-logger help
+logger.py
 ```
