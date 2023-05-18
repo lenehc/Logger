@@ -1,4 +1,4 @@
-MAIN_DB_PATH = ''
+DB_PATH = ''
 
 ENABLE_COLOR = True
 
