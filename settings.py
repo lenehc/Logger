@@ -1,3 +1,5 @@
+MAIN_DB_PATH = ''
+
 ENABLE_COLOR = True
 
 GUTTER = 3

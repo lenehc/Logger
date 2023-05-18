@@ -47,7 +47,10 @@ class Log(Base):
     comments = Column(String)
 
 
-engine = create_engine("sqlite:///.logger.db?foreign_keys=1")
+db_path = settings.DB_PATH if settings.DB_PATH else '.logger.db'
+
+
+engine = create_engine("sqlite:///{db_path}?foreign_keys=1")
 
 
 Base.metadata.create_all(engine)
