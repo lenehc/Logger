@@ -90,9 +90,9 @@ ERR_INVALID_BOOK_ID = 'Could not find a book with the provided ID.'
 ERR_INVALID_ITEM_ID = 'Could not find a book or log with the provided ID.'
 
 ERR_LOG_EXISTS = 'A log already exists for \'{}\' at \'{}:{}\'.'
-ERR_REQUIRED_FIELD = '\"{}\" is a required field.'
-ERR_LIMIT = 'Invalid \"{}\", exceeds limit: {}.'
-ERR_FORMAT = 'Invalid \"{}\", format: {}.'
+ERR_REQUIRED_FIELD = '\"{}\" is required.'
+ERR_LIMIT = '\"{}\" must be less than {}.'
+ERR_FORMAT = '\"{}\" must be of format {}.'
 
 HEADER_ERR_INVALID_DB_PATH = 'Invalid Database Path'
 HEADER_ERR_INVALID_COMMAND = 'Invalid Command'
@@ -110,8 +110,8 @@ HEADER_SHOW_ALL_BOOKS = 'All'
 HEADER_SHOW_BOOK = 'Book Info'
 HEADER_SHOW_LOG = 'Log Info'
 
-MSG_NO_BOOKS = 'No books in library'
-MSG_NO_LOGS = 'No logs for this book'
+MSG_NO_BOOKS = 'No books'
+MSG_NO_LOGS = 'No logs'
 MSG_NO_RESULTS = 'No results'
 
 PROMPT_DELETE = {
