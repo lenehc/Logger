@@ -12,7 +12,6 @@ from contextlib import contextmanager
 from sqlalchemy import create_engine, select, insert, update, and_, or_, Column, ForeignKey, CheckConstraint, Integer, String, Date, Time
 from sqlalchemy.orm import relationship, backref, declarative_base, Session
 
-
 logging.basicConfig(format='%(message)s', level=logging.INFO)
 
 
@@ -45,414 +44,6 @@ class Log(Base):
     page_end = Column(Integer)
     depth = Column(Integer)
     comments = Column(String)
-
-
-db_path = settings.DB_PATH if settings.DB_PATH else '.logger.db'
-
-
-engine = create_engine(f"sqlite:///{db_path}?foreign_keys=1")
-
-
-Base.metadata.create_all(engine)
-
-
-session = Session(engine)
-
-
-@contextmanager
-def session_scope():
-    try:
-        yield session
-        session.commit()
-    except:
-        session.rollback()
-        raise
-    finally:
-        session.close()
-
-
-def delta_from_time(start_time, end_time):
-    start_time_delta = timedelta(hours=start_time.hour, minutes=start_time.minute)
-    end_time_delta = timedelta(hours=end_time.hour, minutes=end_time.minute)
-    return (end_time_delta - start_time_delta).seconds
-
-
-def get_book(book_id):
-    db = DB()
-    try:
-        book_id = int(book_id)
-        if db._is_valid_book_id(book_id):
-            return db.book_obj(book_id)
-    except ValueError:
-        pass
-    return
-
-
-def get_item(item_id):
-    db = DB()
-    book = get_book(item_id)
-
-    if book:
-        return book
-
-    try:
-        id = datetime.strptime(item_id, '%Y-%m-%d.%H:%M')
-        date = id.date()
-        time_start = id.time()
-        if db._is_valid_log_id(date, time_start):
-            return db.log_obj(date, time_start)
-    except ValueError:
-        pass
-
-    return
-
-
-def is_valid_book_title(title):
-    if len(title) > settings.LIMIT_BOOK_TITLE_LENGTH:
-        return False
-
-    return title 
-
-
-def is_valid_author_name(name):
-    if len(name) > settings.LIMIT_AUTHOR_NAME_LENGTH:
-        return False
-
-    return name
-
-
-def is_valid_date(date):
-    try:
-        date = datetime.strptime(date, settings.INPUT_DATE_FORMAT)
-        return date.date()
-    except ValueError:
-        return False
-
-
-def is_valid_time_span(time_span):
-    try:
-        start, end = [datetime.strptime(t, '%H:%M').time() for t in time_span.split('-')]
-        if start > end:
-            return False
-        return start, end
-    except ValueError:
-        return False
-
-
-def is_valid_page_span(page_span):
-    try:
-        start, end = map(int, page_span.split('-'))
-        if start > end:
-            return False
-        return start, end
-    except ValueError:
-        return False
-
-
-def is_valid_comments(comments):
-    if len(comments) > settings.LIMIT_COMMENTS_LENGTH:
-        return False
-
-    return comments
-
-
-def is_valid_depth(depth):
-    try:
-        depth = int(depth)
-        return depth
-    except ValueError:
-        return False
-
-
-class Add:
-    def __init__(self):
-        self.db = DB()
-        self.printer = Printer()
-
-        self.fields_add_book = {
-            'title': {
-                'required': False,
-                'check': is_valid_book_title
-            },
-            'author': {
-                'required': False,
-                'check': is_valid_author_name
-            }
-        }
-        self.fields_add_log = {
-            'date': {
-                'required': True,
-                'check': is_valid_date
-            },
-            'time': {
-                'required': True,
-                'check': is_valid_time_span
-            },
-            'pages': {
-                'required': False,
-                'check': is_valid_page_span,
-            },
-            'depth': {
-                'required': False,
-                'check': is_valid_depth,
-            },
-            'comments': {
-                'required': False,
-                'check': is_valid_comments
-            }
-        }
-
-    def run(self, args):
-        if args == []:
-            response = self.printer.add_book(self.fields_add_book)
-            self.db.insert_book(response)
-            self.printer.print_action_add()
-
-            return True
-
-        book = get_book(args[0])
-
-        if not book:
-            self.printer.print_err_invalid_book_id()
-
-        elif len(args) == 1:
-            response  = self.printer.add_log(self.fields_add_log, book)
-            response = {
-                'book_id': book.id, 
-                'date': response['date'], 
-                'time_start': response['time'][0], 
-                'time_end': response['time'][1], 
-                'page_start': response['pages'][0] if response['pages'] else None, 
-                'page_end': response['pages'][1] if response['pages'] else None,
-                'depth': response['depth'], 
-                'comments': response['comments']
-            }
-
-            log_id = (response['date'], response['time_start'])
-
-            if self.db._is_valid_log_id(*log_id):
-                self.printer.print_err_log_exists(*log_id)
-
-            self.db.insert_log(response)
-            self.printer.print_action_add()
-
-            return True
-
-        return False
-
-
-class Edit:
-    def __init__(self):
-        self.db = DB()
-        self.printer = Printer()
-
-        self.fields_edit_book = {
-            'title': {
-                'required': False,
-                'check': is_valid_book_title
-            },
-            'author': {
-                'required': False,
-                'check': is_valid_author_name
-            }
-        }
-        self.fields_edit_log = {
-            'date': {
-                'required': True,
-                'check': is_valid_date
-            },
-            'time': {
-                'required': True,
-                'check': is_valid_time_span
-            },
-            'pages': {
-                'required': False,
-                'check': is_valid_page_span,
-            },
-            'depth': {
-                'required': False,
-                'check': is_valid_depth,
-            },
-            'comments': {
-                'required': False,
-                'check': is_valid_comments
-            }
-        }
-
-    def run(self, args):
-        if len(args) != 1:
-            return False
-
-        item = get_item(args[0])
-
-        if not item:
-            self.printer.print_err_invalid_item_id()
-
-        if isinstance(item, Log):
-            response = self.printer.edit_log(self.fields_edit_log, item.book)
-            response = {
-                'date': response['date'], 
-                'time_start': response['time'][0], 
-                'time_end': response['time'][1], 
-                'page_start': response['pages'][0] if response['pages'] else None, 
-                'page_end': response['pages'][1] if response['pages'] else None,
-                'depth': response['depth'], 
-                'comments': response['comments']
-            }
-
-            self.db.update_log(item.date, item.time_start, response)
-            self.printer.print_action_edit()
-            pass
-
-        elif isinstance(item, Book):
-            response = self.printer.edit_book(self.fields_edit_book, item)
-            self.db.update_book(item.id, response)
-            self.printer.print_action_edit()
-
-        return True
-
-
-class Remove:
-    def __init__(self):
-        self.db = DB()
-        self.printer = Printer()
-
-    def run(self, args):
-        if len(args) < 1:
-            return False
-        
-        books, logs = set(), set()
-
-        for arg in args:
-            item = get_item(arg)
-
-            if not item:
-                self.printer.print_err_invalid_item_id()
-            
-            if isinstance(item, Log):
-                logs.add(item)
-
-            elif isinstance(item, Book):
-                books.add(item)
-                for log in item.logs:
-                    logs.add(log)
-
-        confirm = self.printer.confirm_delete(books, logs)
-
-        if confirm:
-            self.db.delete_items(logs | books)
-
-        self.printer.print_action_delete(confirm)
-
-        return True
-
-
-class Show:
-    def __init__(self):
-        self.db = DB()
-        self.printer = Printer()
-
-    def run(self, args):
-        if args == []:
-            books = self.db.get_all_books()
-            self.printer.print_all_books(books)
-
-            return True
-
-        item = get_item(args[0])
-
-        if not item:
-            self.printer.print_err_invalid_item_id()
-        
-        if len(args) == 1 and item:
-            if isinstance(item, Log):
-                book = self.db.book_obj(item.book_id)
-                self.printer.print_log_info(book, item)
-
-            elif isinstance(item, Book):
-                self.printer.print_book_info(item)
-
-            return True
-
-        return False
-
-
-class Search:
-    def __init__(self):
-        self.db = DB()
-        self.printer = Printer()
-
-
-    def run(self, args):
-        if len(args) == 1:
-            results = self.db.search(args[0])
-
-            self.printer.print_search_results(args[0], results)
-
-            return True
-            
-        return False
-
-
-class DB:
-    def __init__(self):
-        pass
-
-    def _generate_book_id(self):
-        while True:
-            book_id = random.randint(1000,9999)
-            if not self._is_valid_book_id(book_id):
-                return book_id
-
-    def _is_valid_book_id(self, book_id):
-        return bool(self.book_obj(book_id))
-
-    def _is_valid_log_id(self, date, time_start):
-        return bool(self.log_obj(date, time_start))
-
-    def _log_id(self, date, time_start):
-        return and_(Log.date == date, Log.time_start == time_start)
-
-    def search(self, query):
-        query = select(Book).where(or_(Book.title.contains(query), Book.author.contains(query)))
-        return session.scalars(query).all()
-
-    def book_obj(self, book_id):
-        query = select(Book).where(Book.id == book_id)
-        return session.scalar(query)
-
-    def log_obj(self, date, time_start):
-        query = select(Log).where(self._log_id(date, time_start))
-        return session.scalar(query)
-    
-    def get_all_books(self):
-        query = select(Book).order_by(Book.title)
-        return session.scalars(query).all()
-
-    def update_book(self, book_id, info):
-        with session_scope() as session:
-            query = update(Book).where(Book.id == book_id).values(**info)
-            session.execute(query)
-
-    def update_log(self, date, time_start, info):
-        with session_scope() as session:
-            query = update(Log).where(self._log_id(date, time_start)).values(**info)
-            session.execute(query)
-
-    def insert_log(self, info):
-        with session_scope() as session:
-            query = insert(Log).values(**info)
-            session.execute(query)
-
-    def insert_book(self, info):
-        with session_scope() as session:
-            query = insert(Book).values(id=self._generate_book_id(), **info)
-            session.execute(query)
-
-    def delete_items(self, items):
-        with session_scope() as session:
-            for item in items:
-                session.delete(item)
 
 
 class Printer:
@@ -540,12 +131,14 @@ class Printer:
         self.header_err_invalid_item_id = settings.HEADER_ERR_INVALID_ITEM_ID
         self.header_err_invalid_book_id = settings.HEADER_ERR_INVALID_BOOK_ID
         self.header_err_invalid_command = settings.HEADER_ERR_INVALID_COMMAND
+        self.header_err_invalid_db_path = settings.HEADER_ERR_INVALID_DB_PATH
 
         self.err_invalid_item_id = settings.ERR_INVALID_ITEM_ID
         self.err_invalid_book_id = settings.ERR_INVALID_BOOK_ID
         self.err_required_field = settings.ERR_REQUIRED_FIELD
         self.err_log_exists = settings.ERR_LOG_EXISTS
         self.err_invalid_command = settings.ERR_INVALID_COMMAND
+        self.err_invalid_db_path = settings.ERR_INVALID_DB_PATH
 
         self.msg_no_books = settings.MSG_NO_BOOKS
         self.msg_no_results = settings.MSG_NO_RESULTS
@@ -876,6 +469,11 @@ class Printer:
         error = self.err_invalid_command
         self.print_error(error, header=header, exit=True)
 
+    def print_err_invalid_db_path(self):
+        header = self.header_err_invalid_db_path
+        error = self.err_invalid_db_path
+        self.print_error(error, header=header, exit=True)
+
     def print_action_delete(self, response):
         action = self.action_delete[response]
         self.print_action(action, new_line_before=True)
@@ -1055,8 +653,418 @@ class Printer:
         return response
 
 
-def main():
+db_path = os.path.expanduser(os.path.abspath(settings.DB_PATH)) if settings.DB_PATH else '.logger.db'
+
+
+engine = create_engine(f"sqlite:///{db_path}?foreign_keys=1")
+
+
+try:
+    Base.metadata.create_all(engine)
+except:
+    Printer().print_err_invalid_db_path()
+
+
+session = Session(engine)
+
+
+@contextmanager
+def session_scope():
+    try:
+        yield session
+        session.commit()
+    except:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+class DB:
+    def __init__(self):
+        pass
+
+    def _generate_book_id(self):
+        while True:
+            book_id = random.randint(1000,9999)
+            if not self._is_valid_book_id(book_id):
+                return book_id
+
+    def _is_valid_book_id(self, book_id):
+        return bool(self.book_obj(book_id))
+
+    def _is_valid_log_id(self, date, time_start):
+        return bool(self.log_obj(date, time_start))
+
+    def _log_id(self, date, time_start):
+        return and_(Log.date == date, Log.time_start == time_start)
+
+    def search(self, query):
+        query = select(Book).where(or_(Book.title.contains(query), Book.author.contains(query)))
+        return session.scalars(query).all()
+
+    def book_obj(self, book_id):
+        query = select(Book).where(Book.id == book_id)
+        return session.scalar(query)
+
+    def log_obj(self, date, time_start):
+        query = select(Log).where(self._log_id(date, time_start))
+        return session.scalar(query)
+    
+    def get_all_books(self):
+        query = select(Book).order_by(Book.title)
+        return session.scalars(query).all()
+
+    def update_book(self, book_id, info):
+        with session_scope() as session:
+            query = update(Book).where(Book.id == book_id).values(**info)
+            session.execute(query)
+
+    def update_log(self, date, time_start, info):
+        with session_scope() as session:
+            query = update(Log).where(self._log_id(date, time_start)).values(**info)
+            session.execute(query)
+
+    def insert_log(self, info):
+        with session_scope() as session:
+            query = insert(Log).values(**info)
+            session.execute(query)
+
+    def insert_book(self, info):
+        with session_scope() as session:
+            query = insert(Book).values(id=self._generate_book_id(), **info)
+            session.execute(query)
+
+    def delete_items(self, items):
+        with session_scope() as session:
+            for item in items:
+                session.delete(item)
+
+
+def delta_from_time(start_time, end_time):
+    start_time_delta = timedelta(hours=start_time.hour, minutes=start_time.minute)
+    end_time_delta = timedelta(hours=end_time.hour, minutes=end_time.minute)
+    return (end_time_delta - start_time_delta).seconds
+
+
+def get_book(book_id):
     db = DB()
+    try:
+        book_id = int(book_id)
+        if db._is_valid_book_id(book_id):
+            return db.book_obj(book_id)
+    except ValueError:
+        pass
+    return
+
+
+def get_item(item_id):
+    db = DB()
+    book = get_book(item_id)
+
+    if book:
+        return book
+
+    try:
+        id = datetime.strptime(item_id, '%Y-%m-%d.%H:%M')
+        date = id.date()
+        time_start = id.time()
+        if db._is_valid_log_id(date, time_start):
+            return db.log_obj(date, time_start)
+    except ValueError:
+        pass
+
+    return
+
+
+def is_valid_book_title(title):
+    if len(title) > settings.LIMIT_BOOK_TITLE_LENGTH:
+        return False
+
+    return title 
+
+
+def is_valid_author_name(name):
+    if len(name) > settings.LIMIT_AUTHOR_NAME_LENGTH:
+        return False
+
+    return name
+
+
+def is_valid_date(date):
+    try:
+        date = datetime.strptime(date, settings.INPUT_DATE_FORMAT)
+        return date.date()
+    except ValueError:
+        return False
+
+
+def is_valid_time_span(time_span):
+    try:
+        start, end = [datetime.strptime(t, '%H:%M').time() for t in time_span.split('-')]
+        if start > end:
+            return False
+        return start, end
+    except ValueError:
+        return False
+
+
+def is_valid_page_span(page_span):
+    try:
+        start, end = map(int, page_span.split('-'))
+        if start > end:
+            return False
+        return start, end
+    except ValueError:
+        return False
+
+
+def is_valid_comments(comments):
+    if len(comments) > settings.LIMIT_COMMENTS_LENGTH:
+        return False
+
+    return comments
+
+
+def is_valid_depth(depth):
+    try:
+        depth = int(depth)
+        return depth
+    except ValueError:
+        return False
+
+
+class Add:
+    def __init__(self):
+        self.db = DB()
+        self.printer = Printer()
+
+        self.fields_add_book = {
+            'title': {
+                'required': False,
+                'check': is_valid_book_title
+            },
+            'author': {
+                'required': False,
+                'check': is_valid_author_name
+            }
+        }
+        self.fields_add_log = {
+            'date': {
+                'required': True,
+                'check': is_valid_date
+            },
+            'time': {
+                'required': True,
+                'check': is_valid_time_span
+            },
+            'pages': {
+                'required': False,
+                'check': is_valid_page_span,
+            },
+            'depth': {
+                'required': False,
+                'check': is_valid_depth,
+            },
+            'comments': {
+                'required': False,
+                'check': is_valid_comments
+            }
+        }
+
+    def run(self, args):
+        if args == []:
+            response = self.printer.add_book(self.fields_add_book)
+            self.db.insert_book(response)
+            self.printer.print_action_add()
+
+            return True
+
+        book = get_book(args[0])
+
+        if not book:
+            self.printer.print_err_invalid_book_id()
+
+        elif len(args) == 1:
+            response  = self.printer.add_log(self.fields_add_log, book)
+            response = {
+                'book_id': book.id, 
+                'date': response['date'], 
+                'time_start': response['time'][0], 
+                'time_end': response['time'][1], 
+                'page_start': response['pages'][0] if response['pages'] else None, 
+                'page_end': response['pages'][1] if response['pages'] else None,
+                'depth': response['depth'], 
+                'comments': response['comments']
+            }
+
+            log_id = (response['date'], response['time_start'])
+
+            if self.db._is_valid_log_id(*log_id):
+                self.printer.print_err_log_exists(*log_id)
+
+            self.db.insert_log(response)
+            self.printer.print_action_add()
+
+            return True
+
+        return False
+
+
+class Edit:
+    def __init__(self):
+        self.db = DB()
+        self.printer = Printer()
+
+        self.fields_edit_book = {
+            'title': {
+                'required': False,
+                'check': is_valid_book_title
+            },
+            'author': {
+                'required': False,
+                'check': is_valid_author_name
+            }
+        }
+        self.fields_edit_log = {
+            'date': {
+                'required': True,
+                'check': is_valid_date
+            },
+            'time': {
+                'required': True,
+                'check': is_valid_time_span
+            },
+            'pages': {
+                'required': False,
+                'check': is_valid_page_span,
+            },
+            'depth': {
+                'required': False,
+                'check': is_valid_depth,
+            },
+            'comments': {
+                'required': False,
+                'check': is_valid_comments
+            }
+        }
+
+    def run(self, args):
+        if len(args) != 1:
+            return False
+
+        item = get_item(args[0])
+
+        if not item:
+            self.printer.print_err_invalid_item_id()
+
+        if isinstance(item, Log):
+            response = self.printer.edit_log(self.fields_edit_log, item.book)
+            response = {
+                'date': response['date'], 
+                'time_start': response['time'][0], 
+                'time_end': response['time'][1], 
+                'page_start': response['pages'][0] if response['pages'] else None, 
+                'page_end': response['pages'][1] if response['pages'] else None,
+                'depth': response['depth'], 
+                'comments': response['comments']
+            }
+
+            self.db.update_log(item.date, item.time_start, response)
+            self.printer.print_action_edit()
+            pass
+
+        elif isinstance(item, Book):
+            response = self.printer.edit_book(self.fields_edit_book, item)
+            self.db.update_book(item.id, response)
+            self.printer.print_action_edit()
+
+        return True
+
+
+class Remove:
+    def __init__(self):
+        self.db = DB()
+        self.printer = Printer()
+
+    def run(self, args):
+        if len(args) < 1:
+            return False
+        
+        books, logs = set(), set()
+
+        for arg in args:
+            item = get_item(arg)
+
+            if not item:
+                self.printer.print_err_invalid_item_id()
+            
+            if isinstance(item, Log):
+                logs.add(item)
+
+            elif isinstance(item, Book):
+                books.add(item)
+                for log in item.logs:
+                    logs.add(log)
+
+        confirm = self.printer.confirm_delete(books, logs)
+
+        if confirm:
+            self.db.delete_items(logs | books)
+
+        self.printer.print_action_delete(confirm)
+
+        return True
+
+
+class Show:
+    def __init__(self):
+        self.db = DB()
+        self.printer = Printer()
+
+    def run(self, args):
+        if args == []:
+            books = self.db.get_all_books()
+            self.printer.print_all_books(books)
+
+            return True
+
+        item = get_item(args[0])
+
+        if not item:
+            self.printer.print_err_invalid_item_id()
+        
+        if len(args) == 1 and item:
+            if isinstance(item, Log):
+                book = self.db.book_obj(item.book_id)
+                self.printer.print_log_info(book, item)
+
+            elif isinstance(item, Book):
+                self.printer.print_book_info(item)
+
+            return True
+
+        return False
+
+
+class Search:
+    def __init__(self):
+        self.db = DB()
+        self.printer = Printer()
+
+
+    def run(self, args):
+        if len(args) == 1:
+            results = self.db.search(args[0])
+
+            self.printer.print_search_results(args[0], results)
+
+            return True
+            
+        return False
+
+
+def main():
     printer = Printer()
     commands = {
         'add': Add,
@@ -1077,7 +1085,6 @@ def main():
         command = command()
     except KeyError:
         printer.print_err_invalid_command()
-        sys.exit(1)
 
     if not command.run(args):
         printer.print_usage()
