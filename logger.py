@@ -559,28 +559,30 @@ class Printer:
     def confirm_delete(self, books, logs):
         header = self.header_remove
         prompt = self.prompt_delete
+        book_title = ''
 
         if books:
-            book_title = self._truncate(next(iter(books)).title, self.limit_prompt_delete_book_title_length)
+            book = next(iter(books))
+            if book.title:
+                book_title = self._truncate(book.title, self.limit_prompt_delete_book_title_length)
 
         log_count = self._format_count_log(len(logs))
         book_count = self._format_count_book(len(books))
         text = ''
 
-        if len(books) == 1 and logs:
-            text += f'\"{book_title}\" and {log_count}'
-        
-        elif len(books) == 1 and not logs:
-            text += f'\"{book_title}\"'
-        
-        elif books and logs:
-            text += f'{book_count} and {log_count}'
-        
-        elif not books:
-            text = log_count
-        
-        elif not logs:
-            text = book_count
+        if len(books) == 1:
+            if book_title:
+                if logs:
+                    text += f'"{book_title}" and {log_count}'
+                else:
+                    text += f'"{book_title}"'
+        else:
+            if books and logs:
+                text += f'{book_count} and {log_count}'
+            elif not books:
+                text = log_count
+            elif not logs:
+                text = book_count
 
         prompt['prompt']['name'] = prompt['prompt']['name'].format(text)
         items = self._parse_layout_options(prompt)
