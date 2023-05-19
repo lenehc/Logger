@@ -520,13 +520,14 @@ class Printer:
 
         self.print_table_log([log])
 
-    def input(self, name, accepted_responses={}, required=False, check_response=None, error='', bool=False, exit_on_error=False):
+    def input(self, name, accepted_responses={}, required=False, check_response=None, error='', bool=False, exit_on_error=False, error_on_empty=True):
         fields = [self._indent, (name, self.span_field_name, self.align_field_name)]
         line = self._format_line(fields)
         response = input(f'{line[0]}{self._gutter}')
 
         if not response and required:
-            error = self.err_required_field.format(name) 
+            if error_on_empty:
+                error = self.err_required_field.format(name) 
 
         elif not response and not required:
             return
@@ -586,7 +587,7 @@ class Printer:
         self.print_header(header)
         self.print_line(items, wrap=True)
 
-        input = self.input('', accepted_responses=self.responses_confirm, bool=True)
+        input = self.input('', accepted_responses=self.responses_confirm, bool=True, required=True, error_on_empty=False)
 
         return input
 
@@ -653,7 +654,7 @@ class Printer:
         return response
 
 
-db_path = os.path.expanduser(os.path.abspath(settings.DB_PATH)) if settings.DB_PATH else '.logger.db'
+db_path = os.path.abspath(os.path.expanduser(settings.DB_PATH)) if settings.DB_PATH else '.logger.db'
 
 
 engine = create_engine(f"sqlite:///{db_path}?foreign_keys=1")
@@ -1089,6 +1090,8 @@ def main():
     if not command.run(args):
         printer.print_usage()
         sys.exit(1)
+    
+    engine.dispose()
         
 
 if __name__ == "__main__":
