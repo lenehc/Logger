@@ -12,6 +12,7 @@ from contextlib import contextmanager
 from sqlalchemy import create_engine, select, insert, update, and_, or_, Column, ForeignKey, CheckConstraint, Integer, String, Date, Time
 from sqlalchemy.orm import relationship, backref, declarative_base, Session
 
+
 logging.basicConfig(format='%(message)s', level=logging.INFO)
 
 
@@ -32,7 +33,7 @@ class Log(Base):
     __tablename__ = "log"
     __table_args__ = (
             CheckConstraint("time_start < time_end"),
-            CheckConstraint("page_start < page_end"),
+            CheckConstraint("page_start <= page_end"),
             )
 
     book_id = Column(Integer, ForeignKey("book.id"), nullable=False)
@@ -431,7 +432,10 @@ class Printer:
 
         for log in book.logs:
             if log.page_end and log.page_start:
-                total_page_count += log.page_end - log.page_start
+                if log.page_end == log.page_start:
+                    total_page_count += 1
+                else:
+                    total_page_count += log.page_end - log.page_start
             total_hour_count += delta_from_time(log.time_start, log.time_end) / 3600
 
         items = [self._indent, (f'{self._format_count_page(total_page_count)}, {self._format_count_hour(round(total_hour_count, 1))}', 6-self.span_indent, 'l')]
@@ -573,9 +577,9 @@ class Printer:
         if len(books) == 1:
             if book_title:
                 if logs:
-                    text += f'"{book_title}" and {log_count}'
+                    text += f'\"{book_title}\" and {log_count}'
                 else:
-                    text += f'"{book_title}"'
+                    text += f'\"{book_title}\"'
         else:
             if books and logs:
                 text += f'{book_count} and {log_count}'
