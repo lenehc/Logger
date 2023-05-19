@@ -84,8 +84,7 @@ STR_NO_DEPTH = ''
 STR_NO_COMMENTS = ''
 STR_HAS_COMMENTS = '*'
 
-ERR_INVALID_SEARCH_QUERY = 'Enter a valid search.'
-ERR_INVALID_COMMAND = 'Enter a valid command: \"add\", \"edit (item ID)\", \"remove (item ID)\", \"show\", \"search (query)\".'
+ERR_INVALID_COMMAND = 'Enter a valid command: add, edit, remove, show, or search.'
 ERR_INVALID_BOOK_ID = 'Could not find a book with the provided ID.'
 ERR_INVALID_ITEM_ID = 'Could not find a book or log with the provided ID.'
 
@@ -94,7 +93,6 @@ ERR_REQUIRED_FIELD = '\"{}\" is a required field.'
 ERR_LIMIT = 'Invalid \"{}\", exceeds limit: {}.'
 ERR_FORMAT = 'Invalid \"{}\", format: {}.'
 
-HEADER_ERR_INVALID_SEARCH_QUERY = 'Invalid Search'
 HEADER_ERR_INVALID_COMMAND = 'Invalid Command'
 HEADER_ERR_INVALID_BOOK_ID = 'Invalid Book ID'
 HEADER_ERR_INVALID_ITEM_ID = 'Invalid Item ID'
@@ -275,9 +273,9 @@ FIELDS_ADD_EDIT_LOG = {
 }
 
 FIELDS_USAGE = {
-    'add': ['Add items', 'Insert a book or log into your database. Run \'logger add [Book-ID]\' to add a log, or \'logger add\' to add a book.'],
-    'edit': ['Edit items', 'Change the details of a book or log. Run \'logger edit [Book-ID]\' to edit a book or \'logger edit [Log-Date].[Log-Start-Time]\' to edit a log.'],
-    'remove': ['Delete items', 'Remove a book or log from your database. Run \'logger remove [Book-ID]\' to delete a book or \'logger remove [Log-Date].[Log-Start-Time]\' to remove a log.'],
-    'show': ['Show items', 'Print the details of a book or log.  Run \'logger show\' to show all books in the database, \'logger show [Book-ID]\' to show the details of a book or \'logger show [Log-Date].[Log-Start-Time]\' to show the details of a log.'],
-    'search': ['Search books', 'Search for a book by title or author. Run \'logger search [Query]\'']
+    'Add': ['Insert an item into your library', 'Run \'add [book ID]\' to add a log, or \'add\' to add a book.'],
+    'Edit': ['Change the details of an item', 'Run \'edit [book ID]\' to edit a book or \'edit [date].[start time]\' to edit a log.'],
+    'Remove': ['Remove an item from your library', 'Run \'remove [book ID]\' to delete a book or \'remove [date].[start time]\' to remove a log.'],
+    'Show': ['Print the details of an item', 'Run \'show\' to show all books in the database, \'show [book ID]\' to show the details of a book or \'show [date].[start time]\' to show the details of a log.'],
+    'Search': ['Search for a book by title or author', 'Run \'search [query]\'.']
 }

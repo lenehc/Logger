@@ -50,7 +50,7 @@ class Log(Base):
 db_path = settings.DB_PATH if settings.DB_PATH else '.logger.db'
 
 
-engine = create_engine("sqlite:///{db_path}?foreign_keys=1")
+engine = create_engine(f"sqlite:///{db_path}?foreign_keys=1")
 
 
 Base.metadata.create_all(engine)
@@ -223,7 +223,7 @@ class Add:
                 'time_start': response['time'][0] , 
                 'time_end': response['time'][1], 
                 'page_start': response['pages'][0] if response['pages'] else None, 
-                'page_end': response['pages'][0] if response['pages'] else None,
+                'page_end': response['pages'][1] if response['pages'] else None,
                 'depth': response['depth'], 
                 'comments': response['comments']
             }
@@ -295,7 +295,7 @@ class Edit:
                 'time_start': response['time'][0] , 
                 'time_end': response['time'][1], 
                 'page_start': response['pages'][0] if response['pages'] else None, 
-                'page_end': response['pages'][0] if response['pages'] else None,
+                'page_end': response['pages'][1] if response['pages'] else None,
                 'depth': response['depth'], 
                 'comments': response['comments']
             }
@@ -539,11 +539,13 @@ class Printer:
         self.header_show_log = settings.HEADER_SHOW_LOG
         self.header_err_invalid_item_id = settings.HEADER_ERR_INVALID_ITEM_ID
         self.header_err_invalid_book_id = settings.HEADER_ERR_INVALID_BOOK_ID
+        self.header_err_invalid_command = settings.HEADER_ERR_INVALID_COMMAND
 
         self.err_invalid_item_id = settings.ERR_INVALID_ITEM_ID
         self.err_invalid_book_id = settings.ERR_INVALID_BOOK_ID
         self.err_required_field = settings.ERR_REQUIRED_FIELD
         self.err_log_exists = settings.ERR_LOG_EXISTS
+        self.err_invalid_command = settings.ERR_INVALID_COMMAND
 
         self.msg_no_books = settings.MSG_NO_BOOKS
         self.msg_no_results = settings.MSG_NO_RESULTS
@@ -869,6 +871,11 @@ class Printer:
         error = self.err_log_exists.format(hour, time_start)
         self.print_error(error, exit=True, new_line_before=True)
 
+    def print_err_invalid_command(self):
+        header = self.header_err_invalid_command
+        error = self.err_invalid_command
+        self.print_error(error, header=header, exit=True)
+
     def print_action_delete(self, response):
         action = self.action_delete[response]
         self.print_action(action, new_line_before=True)
@@ -1069,7 +1076,7 @@ def main():
         command = commands[sys.argv[1]]
         command = command()
     except KeyError:
-        printer.print_usage()
+        printer.print_err_invalid_command()
         sys.exit(1)
 
     if not command.run(args):
