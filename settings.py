@@ -31,14 +31,6 @@ STR_PAGE_PLURAL = 'pages'
 STR_MINUTE_SINGULAR = 'minute'
 STR_MINUTE_PLURAL = 'minutes'
 
-STR_ADD_BOOK_TITLE_FIELD_NAME = 'Title' 
-STR_ADD_BOOK_AUTHOR_FIELD_NAME = 'Author' 
-STR_ADD_LOG_DATE_FIELD_NAME = 'Date' 
-STR_ADD_LOG_TIME_FIELD_NAME = 'Time' 
-STR_ADD_LOG_PAGES_FIELD_NAME = 'Pages' 
-STR_ADD_LOG_DEPTH_FIELD_NAME = 'Depth' 
-STR_ADD_LOG_COMMENTS_FIELD_NAME = 'Comments' 
-
 STR_EDIT_BOOK_TITLE_FIELD_NAME = {
     'default': 'Title',
     9: 'New title'
@@ -59,7 +51,7 @@ SPAN_FIELD_NAME = 1
 SPAN_FIELD_VALUE = 4
 SPAN_FOOTNOTE = 3
 
-LIMIT_COMMENTS_LENGTH = 10
+LIMIT_COMMENTS_LENGTH = 300
 LIMIT_BOOK_TITLE_LENGTH = 80
 LIMIT_AUTHOR_NAME_LENGTH = 30
 LIMIT_PROMPT_DELETE_BOOK_TITLE_LENGTH = 50
@@ -82,6 +74,7 @@ STR_NO_AUTHOR = ''
 STR_NO_LOGS = ''
 STR_NO_DEPTH = ''
 STR_NO_COMMENTS = ''
+
 STR_HAS_COMMENTS = '*'
 
 ERR_INVALID_DB_PATH = 'Could not find or create a database at the given location.'
@@ -266,7 +259,7 @@ FIELDS_ADD_EDIT_LOG = {
     },
     'depth': {
         'name': 'Depth',
-        'error': 'Invalid \"Depth\", must be a numerical value.',
+        'error': '\"Depth\" must be a numerical value.',
     },
     'comments': {
         'name': 'Comments',

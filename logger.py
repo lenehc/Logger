@@ -111,12 +111,12 @@ class Printer:
         self.action_add = settings.ACTION_ADD
         self.action_edit = settings.ACTION_EDIT
 
-        self.rows_book_expand = settings.ROWS_BOOK_EXPAND
-
         self.fields_log_info = settings.FIELDS_LOG_INFO
+        self.fields_usage = settings.FIELDS_USAGE
         self.fields_add_edit_book = settings.FIELDS_ADD_EDIT_BOOK
         self.fields_add_edit_log = settings.FIELDS_ADD_EDIT_LOG
-        self.fields_usage = settings.FIELDS_USAGE
+
+        self.rows_book_expand = settings.ROWS_BOOK_EXPAND
 
         self.header_usage = settings.HEADER_USAGE
         self.header_add_book = settings.HEADER_ADD_BOOK
@@ -128,6 +128,7 @@ class Printer:
         self.header_show_all_books = settings.HEADER_SHOW_ALL_BOOKS
         self.header_show_book = settings.HEADER_SHOW_BOOK
         self.header_show_log = settings.HEADER_SHOW_LOG
+
         self.header_err_invalid_item_id = settings.HEADER_ERR_INVALID_ITEM_ID
         self.header_err_invalid_book_id = settings.HEADER_ERR_INVALID_BOOK_ID
         self.header_err_invalid_command = settings.HEADER_ERR_INVALID_COMMAND
