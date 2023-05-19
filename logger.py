@@ -220,7 +220,7 @@ class Add:
             response = {
                 'book_id': book.id, 
                 'date': response['date'], 
-                'time_start': response['time'][0] , 
+                'time_start': response['time'][0], 
                 'time_end': response['time'][1], 
                 'page_start': response['pages'][0] if response['pages'] else None, 
                 'page_end': response['pages'][1] if response['pages'] else None,
@@ -292,7 +292,7 @@ class Edit:
             response = self.printer.edit_log(self.fields_edit_log, item.book)
             response = {
                 'date': response['date'], 
-                'time_start': response['time'][0] , 
+                'time_start': response['time'][0], 
                 'time_end': response['time'][1], 
                 'page_start': response['pages'][0] if response['pages'] else None, 
                 'page_end': response['pages'][1] if response['pages'] else None,
