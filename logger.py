@@ -55,21 +55,6 @@ class Printer:
         self._gutter = ' ' * settings.GUTTER
         self._margin = ' ' * settings.MARGIN
 
-        self.str_log_singular = settings.STR_LOG_SINGULAR
-        self.str_log_plural = settings.STR_LOG_PLURAL
-        self.str_book_singular = settings.STR_BOOK_SINGULAR
-        self.str_book_plural = settings.STR_BOOK_PLURAL
-        self.str_hour_singular = settings.STR_HOUR_SINGULAR
-        self.str_hour_plural = settings.STR_HOUR_PLURAL
-        self.str_page_singular = settings.STR_PAGE_SINGULAR
-        self.str_page_plural = settings.STR_PAGE_PLURAL
-        self.str_no_author = settings.STR_NO_AUTHOR
-        self.str_no_title = settings.STR_NO_TITLE
-
-        self.fields_usage = settings.FIELDS_USAGE
-
-        self.header_usage = settings.HEADER_USAGE
-
     def _parse_layout_options(self, options, locals=None):
         layout = []
 
@@ -170,21 +155,21 @@ class Printer:
         
         return line_strings
     
-    def _format_count(self, count, plural_name, singular_name):
-        name = singular_name if count == 1 else plural_name
+    def _format_count(self, count, plural, singular):
+        name = singular if count == 1 else plural
         return f'{count} {name}'
 
     def _format_count_log(self, log_count):
-        return self._format_count(log_count, self.str_log_plural, self.str_log_singular)
+        return self._format_count(log_count, settings.STR_LOG_PLURAL, settings.STR_LOG_SINGULAR)
 
     def _format_count_book(self, book_count):
-        return self._format_count(book_count, self.str_book_plural, self.str_book_singular)
+        return self._format_count(book_count, settings.STR_BOOK_PLURAL, settings.STR_BOOK_SINGULAR)
 
     def _format_count_page(self, page_count):
-        return self._format_count(page_count, self.str_page_plural, self.str_page_singular)
+        return self._format_count(page_count, settings.STR_PAGE_PLURAL, settings.STR_PAGE_SINGULAR)
 
     def _format_count_hour(self, hour_count):
-        return self._format_count(hour_count, self.str_hour_plural, self.str_hour_singular)
+        return self._format_count(hour_count, settings.STR_HOUR_PLURAL, settings.STR_HOUR_SINGULAR)
 
     def print_line(self, items, print_method=logging.info, new_line_before=False, new_line_after=False, **kwargs):
         line_strings = self._format_line(items, **kwargs)
@@ -330,8 +315,8 @@ class Printer:
         
     def print_book_expand(self, book, new_line_before=False, new_line_after=False):
         id = book.id
-        title = self.str_no_title if not book.title else book.title
-        author = self.str_no_author if not book.author else book.author
+        title = settings.STR_NO_TITLE if not book.title else book.title
+        author = settings.STR_NO_AUTHOR if not book.author else book.author
 
         row1_items = [(id, 1, 'l'), (title, 5, 'l')]
         row2_items = [self._indent, (author, 5, 'l')]
@@ -370,54 +355,6 @@ class Printer:
             self.print_book_expand(book, new_line_after=True)
             self.print_item_count(log_count=len(book.logs), page_count=page_count, hour_count=hour_count)
 
-    def print_err_invalid_item_id(self, id):
-        error = settings.ERR_INVALID_ITEM_ID.format(id)
-        self.print_error(error, exit=True)
-
-    def print_err_invalid_book_id(self):
-        error = settings.ERR_INVALID_BOOK_ID
-        self.print_error(error, exit=True)
-
-    def print_err_log_exists(self):
-        error = settings.ERR_LOG_EXISTS
-        self.print_error(error, exit=True)
-
-    def print_err_required_field(self, name):
-        error = settings.ERR_REQUIRED_FIELD.format(name)
-        self.print_error(error, exit=True)
-
-    def print_err_invalid_db_path(self):
-        error = settings.ERR_INVALID_DB_PATH
-        self.print_error(error, exit=True)
-
-    def print_action_delete(self, response):
-        action = settings.ACTION_DELETE[response]
-        self.print_action(action)
-
-    def print_action_add(self):
-        action = settings.ACTION_ADD
-        self.print_action(action)
-
-    def print_action_edit(self):
-        action = settings.ACTION_EDIT
-        self.print_action(action)
-
-    def print_usage(self):
-        self.print_header(settings.HEADER_USAGE)
-        for name, value in self.fields_usage.items():
-            self.print_field(name,value)
-
-    def print_usage_field(self, usage):
-        self.print_field(settings.STR_FIELD_USAGE, usage)
-
-    def print_all_books(self, books):
-        empty_message = settings.MSG_NO_BOOKS
-        self.print_books(books, empty_message)
-    
-    def print_search_results(self, results):
-        empty_message = settings.MSG_NO_RESULTS
-        self.print_books(results, empty_message)
-    
     def input(self, name, accepted_responses={}, required=False, check_response=None, error='', bool=False, exit_on_error=False, error_on_empty=True):
         fields = [self._indent, (name, 1, 'r')]
         line = self._format_line(fields)
@@ -666,15 +603,14 @@ def parse_args(fields, args, usage):
 
         if not value:
             if required:
-                printer.print_err_required_field(metavar)
+                printer.print_error(settings.ERR_REQUIRED_FIELD.format(metavar), exit=True)
 
         elif check:
             res = check(value)
             if res == False:
                 if error:
                     printer.print_error(error, exit=True)
-                printer.print_usage_field(usage)
-                sys.exit(1)
+                printer.print_usage(usage)
             elif res != True:
                 arg_fields[name] = res
                 continue
@@ -745,28 +681,25 @@ class Add:
 
     def run(self, args):
         if len(args) < 1:
-            self.printer.print_usage_field(settings.USAGE_ADD)
-            sys.exit(1)
+            self.printer.print_usage(settings.USAGE_ADD)
         
         command = args[0]
         args = args[1:]
 
         if command == 'book':
             if not args or len(args) > 2:
-                self.printer.print_usage_field(settings.USAGE_ADD_BOOK)
-                sys.exit(1)
+                self.printer.print_usage(settings.USAGE_ADD_BOOK)
 
             args = parse_args(self.fields_book, args, settings.USAGE_ADD_BOOK)
 
             self.db.insert_book(**args)
             self.printer.print_action_add()
 
-            return True
+            return
 
         elif command == 'log':
             if not args or len(args) > 4:
-                self.printer.print_usage_field(settings.USAGE_ADD_LOG)
-                sys.exit(1)
+                self.printer.print_usage(settings.USAGE_ADD_LOG)
 
             args = parse_args(self.fields_log, args, settings.USAGE_ADD_LOG)
 
@@ -781,14 +714,14 @@ class Add:
             }
 
             if self.db._is_valid_log_id(args['date'], args['time_start']):
-                self.printer.print_err_log_exists()
+                self.printer.print_error(settings.ERR_LOG_EXISTS, exit=True)
 
             self.db.insert_log(**args)
-            self.printer.print_action_add()
+            self.printer.print_action(settings.ACTION_ADD)
 
-            return True
+            return
         
-        return False
+        self.printer.print_usage(settings.USAGE_ADD)
 
 
 class Edit:
@@ -822,15 +755,14 @@ class Edit:
 
     def run(self, args):
         if not args or len(args) > 3:
-            self.printer.print_usage_field(settings.USAGE_EDIT)
-            sys.exit(1)
+            self.printer.print_usage(settings.USAGE_EDIT)
 
         args = parse_args(self.fields, args, settings.USAGE_EDIT)
 
         self.db.update_book(**args)
-        self.printer.print_action_edit()
+        self.printer.print_action(settings.ACTION_EDIT)
 
-        return True
+        return
 
 
 class Remove:
@@ -840,8 +772,7 @@ class Remove:
 
     def run(self, args):
         if len(args) < 1:
-            self.printer.print_usage_field(settings.USAGE_REMOVE)
-            sys.exit(1)
+            self.printer.print_usage(settings.USAGE_REMOVE)
         
         books, logs = set(), set()
 
@@ -849,7 +780,7 @@ class Remove:
             item = get_item(arg)
 
             if not item:
-                self.printer.print_err_invalid_item_id(self.printer._truncate(arg, 20))
+                self.printer.print_error(settings.ERR_INVALID_ITEM_ID.format(self.printer._truncate(arg, 20)), exit=True)
             
             if isinstance(item, Log):
                 logs.add(item)
@@ -863,8 +794,10 @@ class Remove:
 
         if confirm:
             self.db.delete_items(logs | books)
+        
+        self.printer.print_action(settings.ACTION_DELETE[confirm], new_line_before=True)
 
-        return True
+        return
 
 
 class Show:
@@ -874,26 +807,23 @@ class Show:
 
     def run(self, args):
         if len(args) > 1:
-            self.printer.print_usage_field(settings.USAGE_SHOW)
-            sys.exit(1)
+            self.printer.print_usage(settings.USAGE_SHOW)
 
         if not args:
             books = self.db.get_all_books()
-            self.printer.print_all_books(books)
+            self.printer.print_books(books, settings.MSG_NO_BOOKS)
 
-            return True
+            return
 
         book = self.db.book_obj(args[0])
 
         if not book:
-            self.printer.print_err_invalid_book_id()
+            self.printer.print_error(settings.ERR_INVALID_BOOK_ID, exit=True)
         
         if len(args) == 1:
             self.printer.print_book_info(book)
 
-            return True
-
-        return False
+            return
 
 
 class Search:
@@ -906,11 +836,11 @@ class Search:
         if len(args) == 1:
             results = self.db.search(args[0])
 
-            self.printer.print_search_results(results)
+            self.printer.print_books(results, settings.MSG_NO_RESULTS)
 
-            return True
-            
-        return False
+            return
+
+        self.printer.print_usage(settings.USAGE_SEARCH)
 
 
 def main():
@@ -924,20 +854,16 @@ def main():
     }
 
     if len(sys.argv[1:]) == 0:
-        printer.print_usage()
-        sys.exit(1)
+        printer.print_error(settings.ERR_INVALID_COMMAND, exit=True)
 
     args = sys.argv[2:]
 
     try:
         command = commands[sys.argv[1]]
     except KeyError:
-        printer.print_usage()
-        sys.exit(1)
+        printer.print_error(settings.ERR_INVALID_COMMAND, exit=True)
 
-    if not command().run(args):
-        printer.print_usage()
-        sys.exit(1)
+    command().run(args)
     
     engine.dispose()
         
