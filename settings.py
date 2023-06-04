@@ -10,18 +10,11 @@ WIDTH = {
     'default': 58,
 }
 
-SPAN_INDENT = 1
-SPAN_FIELD_NAME = 1
-SPAN_FIELD_VALUE = 4
-SPAN_FOOTNOTE = 3
-
-LIMIT_BOOK_TITLE_LENGTH = 80
-LIMIT_AUTHOR_NAME_LENGTH = 30
-LIMIT_PROMPT_DELETE_BOOK_TITLE_LENGTH = 30
-LIMIT_QUERY_PRINT_LENGTH = 20
+LIMIT_TITLE_LENGTH = 80
+LIMIT_AUTHOR_LENGTH = 30
+LIMIT_PROMPT_DELETE_TITLE_LENGTH = 30
 
 FORMAT_DATE_INPUT = '%Y-%m-%d'
-FORMAT_DATE_FIELD = '%B %d, %Y'
 FORMAT_DATE = {
     'default': '%d/%m/%y',
 }
@@ -36,32 +29,37 @@ STR_PAGE_SINGULAR = 'page'
 STR_PAGE_PLURAL = 'pages'
 STR_MINUTE_SINGULAR = 'minute'
 STR_MINUTE_PLURAL = 'minutes'
-STR_NO_TITLE_EXPAND = 'Unknown Book'
-STR_NO_AUTHOR_EXPAND = 'Unknown Author'
-STR_NO_PAGES = ''
 STR_NO_TITLE = 'Unknown Book'
-STR_NO_AUTHOR = ''
-STR_NO_LOGS = ''
-STR_NO_DEPTH = ''
+STR_NO_AUTHOR = 'Unknown Author'
 
-ALIGN_FIELD_NAME = 'r'
-ALIGN_FIELD_VALUE = 'l'
-ALIGN_ERROR = 'l'
-ALIGN_ACTION = 'l'
-ALIGN_FOOTNOTE = 'l'
+STR_FIELD_TITLE = 'Title'
+STR_FIELD_AUTHOR = 'Author'
+STR_FIELD_BOOK_ID = 'Book ID'
+STR_FIELD_DATE = 'Date'
+STR_FIELD_TIME = 'Time'
+STR_FIELD_PAGES = 'Pages'
+STR_FIELD_DEPTH = 'Depth'
+STR_FIELD_USAGE = 'Usage'
 
-ERR_INVALID_DB_PATH = 'Could not find or create a database at the given location.'
-ERR_INVALID_COMMAND = 'Enter a valid command: {}.'
-ERR_INVALID_BOOK_ID = 'Could not find a book with the provided ID.'
-ERR_INVALID_ITEM_ID = 'Could not find a book or log with the provided ID.'
-ERR_LOG_EXISTS = 'A log already exists for \'{}\' at \'{}:{}\'.'
-ERR_REQUIRED_FIELD = '\"{}\" is required.'
-ERR_LIMIT = '\"{}\" must be less than {}.'
-ERR_FORMAT = '\"{}\" must be of format \'{}\'.'
+ERR_INVALID_DB_PATH = 'Invalid DB Path'
+ERR_INVALID_BOOK_ID = 'Invalid Book ID'
+ERR_INVALID_ITEM_ID = 'Invalid Item ID \'{}\''
+ERR_LOG_EXISTS = 'Log already exists'
+ERR_REQUIRED_FIELD = '{} is required'
+ERR_LIMIT = '{} must be less than {}'
+ERR_FORMAT = '{} must be of format {}'
 
-MSG_NO_BOOKS = 'No books'
-MSG_NO_LOGS = 'No logs'
-MSG_NO_RESULTS = 'No results'
+ERR_INVALID_TITLE = ERR_LIMIT.format('Title', LIMIT_TITLE_LENGTH)
+ERR_INVALID_AUTHOR = ERR_LIMIT.format('Author', LIMIT_AUTHOR_LENGTH)
+
+ERR_INVALID_DATE = ERR_FORMAT.format('Date', 'YYYY-MM-DD')
+ERR_INVALID_TIME_SPAN = ERR_FORMAT.format('Time', 'H:M-H:M')
+ERR_INVALID_PAGE_SPAN = ERR_FORMAT.format('Pages', 'P-P')
+ERR_INVALID_DEPTH = '\"Depth\" must be numerical'
+
+MSG_NO_BOOKS = 'No Books'
+MSG_NO_LOGS = 'No Logs'
+MSG_NO_RESULTS = 'No Results'
 
 ACTION_ADD = 'Added'
 ACTION_EDIT = 'Edited'
@@ -70,145 +68,84 @@ ACTION_DELETE = {
     False: 'Canceled'
 }
 
+HELP_ADD = 'Insert a book or log into your library'
+HELP_EDIT = 'Edit the title or author of a book'
+HELP_REMOVE = 'Delete books or logs from your library'
+HELP_SHOW = 'Print your library or details of a book'
+HELP_SEARCH = 'Search for a book by title or author'
+
+USAGE_ADD = 'book [title] [author] | log <date> <time> [pages] [depth]'
+USAGE_ADD_BOOK = '[title] [author]'
+USAGE_ADD_LOG = '<date> <time> [pages] [depth]'
+USAGE_EDIT = '<bookID> [title] [author]'
+USAGE_REMOVE = '<itemID> ...'
+USAGE_SHOW = '[bookID]'
+USAGE_SEARCH = '<query>'
+
+FIELDS_USAGE = {
+    'add': [HELP_ADD, f'Run: book {USAGE_ADD_BOOK} to add a book, log {USAGE_ADD_LOG} to add a log.'],
+    'edit': ['Edit the title or author of a book', f'Run: {USAGE_EDIT}'],
+    'remove': ['Delete books or logs from your library', f'Run: {USAGE_REMOVE}'],
+    'show': ['Print your library or details of a book', f'Run: {USAGE_SHOW}'],
+    'search': ['Search for a book by title or author', '', f'Run: {USAGE_SEARCH}']
+}
+
 COLOR_NORMAL = '\x1b[0m'
 COLOR_ROW_BACKGROUND = '\x1b[48;2;30;30;30m'
-COLOR_FOREGROUND = '\x1b[38;2;245;245;245m'
+COLOR_FOREGROUND = '\x1b[38;2;255;255;255m'
 
 HEADERS_TABLE_BOOK = {
     'id': {
         'name': '', 
         'span': 1, 
         'align': 'l', 
-        'show': True
     }, 
     'title': {
         'name': 'Title', 
         'span': 2, 
         'align': 'l', 
-        'show': True
     }, 
     'author': {
         'name': 'Author', 
         'span': 2, 
         'align': 'l', 
-        'show': True
     }, 
     'log_count': {
-        'name': 'Logs', 
+        'name': '', 
         'span': 1, 
         'align': 'l', 
-        'show': True
     }
 }
 HEADERS_TABLE_LOG = {
     'BLANK': {
         'span': 1
     },
-    'book_id': {
-        'name': '', 
-        'span': 1, 
-        'align': 'l', 
-        'show': False
-    }, 
     'date': {
         'name': 'Date', 
         'span': 1, 
         'align': 'l', 
-        'show': True
     }, 
     'time': {
         'name': 'Time', 
         'span': 1, 
         'align': 'l', 
-        'show': True
     }, 
     'pages': {
         'name': 'Pages', 
         'span': 1, 
         'align': 'l', 
-        'show': True
     }, 
     'depth': {
         'name': 'Depth', 
         'span': 1, 
         'align': 'r', 
-        'show': True
     }, 
 }
 
-FIELDS_ADD_EDIT_BOOK = {
-    'title': {
-        'name': 'Title',
-        'error': ERR_LIMIT.format('Title', LIMIT_BOOK_TITLE_LENGTH),
-    },
-    'author': {
-        'name': 'Author',
-        'error':  ERR_LIMIT.format('Author', LIMIT_AUTHOR_NAME_LENGTH)
-    }
-}
-FIELDS_ADD_LOG = {
-    'date': {
-        'name': 'Date',
-        'error': ERR_FORMAT.format('Date', 'YYYY-MM-DD'),
-    },
-    'time': {
-        'name': 'Time',
-        'error': ERR_FORMAT.format('Time', 'H:M-H:M'),
-    },
-    'pages': {
-        'name': 'Pages',
-        'error': ERR_FORMAT.format('Pages', 'P-P'),
-    },
-    'depth': {
-        'name': 'Depth',
-        'error': '\"Depth\" must be a numerical value.',
-    },
-}
-FIELDS_USAGE = {
-    'Add': 'Run \'add\' to add a book or \'add [book ID]\' to add a log.',
-    'Edit': 'Run \'edit [book ID]\'.',
-    'Remove': 'Run \'remove [book ID]\' to delete a book or \'remove [date].[start time]\' to delete a log.',
-    'Show': 'Run \'show\' to print your library or \'show [book ID]\' to print the details of a book.',
-    'Search': 'Run \'search [query]\'.'
-}
+
+
 
 RESPONSES_CONFIRM = {'yes', 'y', 'delete'}
 HEADER_USAGE = 'Usage'
-ROWS_BOOK_EXPAND = [
-    {
-        'id': {
-            'name': '',
-            'span': SPAN_INDENT, 
-            'align': 'l', 
-            'show': True
-        },
-        'title': {
-            'name': '',
-            'span': 3, 
-            'align': 'l', 
-            'show': True
-        }
-    }, 
-    {
-        'BLANK': {
-            'span': SPAN_INDENT
-        },
-        'author': {
-            'name': '',
-            'span': 3, 
-            'align': 'l', 
-            'show': True
-        }
-    }
-]
-PROMPT_DELETE = {
-    'BLANK': {
-        'span': SPAN_INDENT
-    },
-    'prompt': {
-        'name': 'Are you sure you want to delete {}?', 
-        'span': 6-SPAN_INDENT, 
-        'align': 'l',
-        'show': True
-    }
-}
+
+PROMPT_DELETE = 'Delete {}?'

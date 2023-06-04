@@ -51,33 +51,9 @@ class Printer:
         self.width = self._find_apt_value(settings.WIDTH, os.get_terminal_size().columns)
         self.columns = self._find_apt_value(settings.COLUMNS.copy(), self.width)
 
-        self.gutter = settings.GUTTER
-        self.margin = settings.MARGIN
-
-        self.span_indent = settings.SPAN_INDENT
-        self.span_footnote = settings.SPAN_FOOTNOTE
-        self.span_field_name = settings.SPAN_FIELD_NAME
-        self.span_field_value = settings.SPAN_FIELD_VALUE
-
-        self._indent = ('', self.span_indent, 'l')
-        self._gutter = ' ' * self.gutter
-        self._margin = ' ' * self.margin
-
-        self.align_field_name = settings.ALIGN_FIELD_NAME
-        self.align_field_value = settings.ALIGN_FIELD_VALUE
-        self.align_footnote = settings.ALIGN_FOOTNOTE
-
-        self.format_date_field = settings.FORMAT_DATE_FIELD
-        self.format_date = settings.FORMAT_DATE
-
-        self.enable_color = settings.ENABLE_COLOR
-
-        self.color_row_background = settings.COLOR_ROW_BACKGROUND
-        self.color_foreground = settings.COLOR_FOREGROUND
-        self.color_normal = settings.COLOR_NORMAL
-        
-        self.headers_table_book = settings.HEADERS_TABLE_BOOK
-        self.headers_table_log = settings.HEADERS_TABLE_LOG
+        self._indent = ('', 1, 'l')
+        self._gutter = ' ' * settings.GUTTER
+        self._margin = ' ' * settings.MARGIN
 
         self.str_log_singular = settings.STR_LOG_SINGULAR
         self.str_log_plural = settings.STR_LOG_PLURAL
@@ -87,43 +63,13 @@ class Printer:
         self.str_hour_plural = settings.STR_HOUR_PLURAL
         self.str_page_singular = settings.STR_PAGE_SINGULAR
         self.str_page_plural = settings.STR_PAGE_PLURAL
-        self.str_no_pages = settings.STR_NO_PAGES
         self.str_no_author = settings.STR_NO_AUTHOR
         self.str_no_title = settings.STR_NO_TITLE
-        self.str_no_logs = settings.STR_NO_LOGS
-        self.str_no_depth = settings.STR_NO_DEPTH
-        self.str_no_author_expand = settings.STR_NO_AUTHOR_EXPAND
-        self.str_no_title_expand = settings.STR_NO_TITLE_EXPAND
-
-        self.action_delete = settings.ACTION_DELETE
-        self.action_add = settings.ACTION_ADD
-        self.action_edit = settings.ACTION_EDIT
 
         self.fields_usage = settings.FIELDS_USAGE
-        self.fields_add_edit_book = settings.FIELDS_ADD_EDIT_BOOK
-        self.fields_add_log = settings.FIELDS_ADD_LOG
-
-        self.rows_book_expand = settings.ROWS_BOOK_EXPAND
 
         self.header_usage = settings.HEADER_USAGE
 
-        self.err_invalid_item_id = settings.ERR_INVALID_ITEM_ID
-        self.err_invalid_book_id = settings.ERR_INVALID_BOOK_ID
-        self.err_required_field = settings.ERR_REQUIRED_FIELD
-        self.err_log_exists = settings.ERR_LOG_EXISTS
-        self.err_invalid_command = settings.ERR_INVALID_COMMAND
-        self.err_invalid_db_path = settings.ERR_INVALID_DB_PATH
-
-        self.msg_no_books = settings.MSG_NO_BOOKS
-        self.msg_no_results = settings.MSG_NO_RESULTS
-        self.msg_no_logs = settings.MSG_NO_LOGS
-
-        self.limit_prompt_delete_book_title_length = settings.LIMIT_PROMPT_DELETE_BOOK_TITLE_LENGTH
-
-        self.prompt_delete = settings.PROMPT_DELETE
-
-        self.responses_confirm = settings.RESPONSES_CONFIRM
-      
     def _parse_layout_options(self, options, locals=None):
         layout = []
 
@@ -134,8 +80,6 @@ class Printer:
             if param == 'BLANK':
                 layout.append(('', option['span'], 'l'))
             else:
-                if not option['show']:
-                    continue
                 name = locals[param] if locals else option['name']
                 layout.append((name, option['span'], option['align']))
 
@@ -150,7 +94,7 @@ class Printer:
 
     def _truncate(self, string, width, align=None):
         if len(string) > width:
-            string = f'{string[:width-3].strip()}...'
+            string = f'{string[:width-2].strip()}..'
             if align and align == 'l':
                 return string.ljust(width)
             if align and align == 'r':
@@ -177,7 +121,7 @@ class Printer:
 
         return items
 
-    def _format_line(self, items, wrap=False, full_just=False, background_color=''):
+    def _format_line(self, items, wrap=False, full_just=False, background_color='', foreground_color=''):
         current_index = 0
 
         formatted_items = []
@@ -186,7 +130,7 @@ class Printer:
             if span <= 0:
                 continue
 
-            width = (span - 1) * self.gutter + sum(self.columns[current_index:current_index+span])
+            width = (span - 1) * settings.GUTTER + sum(self.columns[current_index:current_index+span])
             current_index += span
 
             if isinstance(string, list):
@@ -217,8 +161,10 @@ class Printer:
             if full_just:
                 line_string = line_string.ljust(self.width)
 
-            if self.enable_color:
-                line_string = f'{self.color_foreground}{background_color}{line_string}{self.color_normal}'
+            if settings.ENABLE_COLOR:
+                if not foreground_color:
+                    foreground_color = settings.COLOR_FOREGROUND
+                line_string = f'{foreground_color}{background_color}{line_string}{settings.COLOR_NORMAL}'
 
             line_strings[i] = line_string
         
@@ -240,8 +186,8 @@ class Printer:
     def _format_count_hour(self, hour_count):
         return self._format_count(hour_count, self.str_hour_plural, self.str_hour_singular)
 
-    def print_line(self, items, wrap=False, new_line_before=False, new_line_after=False, full_just=False, background_color='', print_method=logging.info):
-        line_strings = self._format_line(items, wrap, full_just, background_color)
+    def print_line(self, items, print_method=logging.info, new_line_before=False, new_line_after=False, **kwargs):
+        line_strings = self._format_line(items, **kwargs)
 
         if new_line_before:
             print_method('')
@@ -255,7 +201,7 @@ class Printer:
     def print_empty_line(self):
         self.print_line([('', 1, 'l')])
 
-    def print_item_count(self, book_count=None, log_count=None, page_count=None, hour_count=None, new_line_before=False, new_line_after=False):
+    def print_item_count(self, book_count=None, log_count=None, page_count=None, hour_count=None, **kwargs):
         fields = []
 
         log_count_string = self._format_count_log(log_count)
@@ -276,26 +222,23 @@ class Printer:
             fields.append(hour_count_string)
 
         string = ', '.join(fields)
-        items = [self._indent, (string, self.span_footnote, 'l')]
-        self.print_line(items, new_line_before=new_line_before, new_line_after=new_line_after)
+        items = [self._indent, (string, 5, 'l')]
+        self.print_line(items, **kwargs)
 
     def print_header(self, header):
-        items = [self._indent, (header, 6-self.span_indent, 'l')]
+        items = [self._indent, (header, 5, 'l')]
         self.print_line(items, new_line_after=True)
 
     def print_field(self, name, value):
-        items = [self._indent, (name, self.span_field_name, self.align_field_name), (value, self.span_field_value, self.align_field_value)] 
+        items = [self._indent, (name, 1, 'r'), (value, 4, 'l')] 
         self.print_line(items, wrap=True)
 
     def print_action(self, action, **kwargs):
-        items = [self._indent, (action, self.span_footnote, self.align_footnote)]
+        items = [self._indent, (action, 5, 'l')]
         self.print_line(items, **kwargs)
 
-    def print_error(self, error, header=None, exit=False, **kwargs):
-        if header:
-            self.print_header(header)
-
-        items = [self._indent, (error, self.span_footnote, self.align_footnote)]
+    def print_error(self, error, exit=False, **kwargs):
+        items = [self._indent, (error, 5, 'l')]
         self.print_line(items, wrap=True, print_method=logging.error, **kwargs)
 
         if exit:
@@ -306,7 +249,7 @@ class Printer:
         self.print_line(items, **kwargs)
 
     def print_table_book(self, books, show_count=True, new_line_before=False, new_line_after=False):
-        headers = self.headers_table_book
+        headers = settings.HEADERS_TABLE_BOOK
         highlight = True
         total_log_count = 0
 
@@ -315,16 +258,16 @@ class Printer:
 
         for book in books:
             id = book.id
-            author = self.str_no_author if not book.author else book.author
-            log_count = self.str_no_logs if not book.logs else len(book.logs)
-            title = self.str_no_title if not book.title else book.title
+            author = book.author
+            log_count = len(book.logs) if book.logs else ''
+            title = book.title if book.title else ''
 
             total_log_count += len(book.logs)
 
             items = self._parse_layout_options(headers, locals=locals())
 
-            if self.enable_color and highlight:
-                self.print_line(items, background_color=self.color_row_background, full_just=True)
+            if settings.ENABLE_COLOR and highlight:
+                self.print_line(items, background_color=settings.COLOR_ROW_BACKGROUND, full_just=True)
                 highlight = False
             else:
                 self.print_line(items)
@@ -339,7 +282,7 @@ class Printer:
             self.print_empty_line()
 
     def print_table_log(self, logs, show_count=True, new_line_before=False, new_line_after=False):
-        headers = self.headers_table_log 
+        headers = settings.HEADERS_TABLE_LOG 
         highlight=True
 
         logs.sort(key=lambda r: r.date)
@@ -348,23 +291,21 @@ class Printer:
             self.print_empty_line()
         
         for log in logs:
-            book_id = log.book_id
-            date = self.format_date.copy()
+            date = settings.FORMAT_DATE.copy()
             time = f'{log.time_start.strftime("%H:%M")} {log.time_end.strftime("%H:%M")}'
-            depth = log.depth if log.depth else self.str_no_depth
+            depth = log.depth
+            pages = ''
 
             if log.page_start and log.page_end:
                 pages = f'{str(log.page_start).ljust(4)} {str(log.page_end).ljust(4)}'
-            else:
-                pages = self.str_no_pages
 
             for item in date:
                 date[item] = log.date.strftime(date[item])
 
             items = self._parse_layout_options(headers, locals=locals())
 
-            if self.enable_color and highlight:
-                self.print_line(items, background_color=self.color_row_background, full_just=True)
+            if settings.ENABLE_COLOR and highlight:
+                self.print_line(items, background_color=settings.COLOR_ROW_BACKGROUND, full_just=True)
                 highlight = False
             else:
                 self.print_line(items)
@@ -388,18 +329,18 @@ class Printer:
             self.print_table_book(books)
         
     def print_book_expand(self, book, new_line_before=False, new_line_after=False):
-        rows = self.rows_book_expand
-
         id = book.id
-        title = self.str_no_title_expand if not book.title else book.title
-        author = self.str_no_author_expand if not book.author else book.author
+        title = self.str_no_title if not book.title else book.title
+        author = self.str_no_author if not book.author else book.author
+
+        row1_items = [(id, 1, 'l'), (title, 5, 'l')]
+        row2_items = [self._indent, (author, 5, 'l')]
 
         if new_line_before:
             self.print_empty_line()
 
-        for row in rows:
-            items = self._parse_layout_options(row, locals=locals())
-            self.print_line(items, wrap=True)
+        self.print_line(row1_items, wrap=True)
+        self.print_line(row2_items, wrap=True)
 
         if new_line_after:
             self.print_empty_line()
@@ -418,7 +359,7 @@ class Printer:
         return total_page_count, round(total_hour_count, 1)
 
     def print_book_info(self, book):
-        empty_message = self.msg_no_logs
+        empty_message = settings.MSG_NO_LOGS
         
         if not book.logs:
             self.print_error(empty_message)
@@ -429,75 +370,62 @@ class Printer:
             self.print_book_expand(book, new_line_after=True)
             self.print_item_count(log_count=len(book.logs), page_count=page_count, hour_count=hour_count)
 
-    def print_log_info(self, book, log):
-        date = log.date.strftime(self.format_date_field)
-        time = f'{log.time_start.strftime("%H:%M")} to {log.time_end.strftime("%H:%M")}'
-        depth = log.depth if log.depth else self.str_no_depth
-
-        if log.page_start and log.page_end:
-            pages = f'{log.page_start} to {log.page_end}'
-        else:
-            pages = self.str_no_pages
-
-        for var_name, name in self.fields_log_info.items():
-            value = locals()[var_name]
-            self.print_field(name, value)
-
-        self.print_book_expand(book, new_line_before=True)
-   
-    def print_err_invalid_item_id(self):
-        error = self.err_invalid_item_id
+    def print_err_invalid_item_id(self, id):
+        error = settings.ERR_INVALID_ITEM_ID.format(id)
         self.print_error(error, exit=True)
 
     def print_err_invalid_book_id(self):
-        error = self.err_invalid_book_id
+        error = settings.ERR_INVALID_BOOK_ID
         self.print_error(error, exit=True)
 
-    def print_err_log_exists(self, hour, time_start):
-        error = self.err_log_exists.format(hour, time_start)
-        self.print_error(error, exit=True, new_line_before=True)
+    def print_err_log_exists(self):
+        error = settings.ERR_LOG_EXISTS
+        self.print_error(error, exit=True)
 
-    def print_err_invalid_command(self, commands):
-        error = self.err_invalid_command.format(', '.join(commands))
+    def print_err_required_field(self, name):
+        error = settings.ERR_REQUIRED_FIELD.format(name)
         self.print_error(error, exit=True)
 
     def print_err_invalid_db_path(self):
-        error = self.err_invalid_db_path
+        error = settings.ERR_INVALID_DB_PATH
         self.print_error(error, exit=True)
 
     def print_action_delete(self, response):
-        action = self.action_delete[response]
-        self.print_action(action, new_line_before=True)
+        action = settings.ACTION_DELETE[response]
+        self.print_action(action)
 
     def print_action_add(self):
-        action = self.action_add
-        self.print_action(action, new_line_before=True)
+        action = settings.ACTION_ADD
+        self.print_action(action)
 
     def print_action_edit(self):
-        action = self.action_edit
-        self.print_action(action, new_line_before=True)
+        action = settings.ACTION_EDIT
+        self.print_action(action)
 
     def print_usage(self):
-        self.print_header(self.header_usage)
+        self.print_header(settings.HEADER_USAGE)
         for name, value in self.fields_usage.items():
             self.print_field(name,value)
 
+    def print_usage_field(self, usage):
+        self.print_field(settings.STR_FIELD_USAGE, usage)
+
     def print_all_books(self, books):
-        empty_message = self.msg_no_books
+        empty_message = settings.MSG_NO_BOOKS
         self.print_books(books, empty_message)
     
     def print_search_results(self, results):
-        empty_message = self.msg_no_results
+        empty_message = settings.MSG_NO_RESULTS
         self.print_books(results, empty_message)
     
     def input(self, name, accepted_responses={}, required=False, check_response=None, error='', bool=False, exit_on_error=False, error_on_empty=True):
-        fields = [self._indent, (name, self.span_field_name, self.align_field_name)]
+        fields = [self._indent, (name, 1, 'r')]
         line = self._format_line(fields)
         response = input(f'{line[0]}{self._gutter}').strip()
 
         if not response and required:
             if error_on_empty:
-                error = self.err_required_field.format(name) 
+                error = settings.ERR_REQUIRED_FIELD.format(name)
 
         elif not response and not required:
             return
@@ -526,13 +454,12 @@ class Printer:
         return response
 
     def confirm_delete(self, books, logs):
-        prompt = self.prompt_delete
         book_title = ''
 
         if books:
             book = next(iter(books))
             if book.title:
-                book_title = self._truncate(book.title, self.limit_prompt_delete_book_title_length)
+                book_title = self._truncate(book.title, settings.LIMIT_PROMPT_DELETE_TITLE_LENGTH)
 
         log_count = self._format_count_log(len(logs))
         book_count = self._format_count_book(len(books))
@@ -552,70 +479,14 @@ class Printer:
             elif not logs:
                 text = book_count
 
-        prompt['prompt']['name'] = prompt['prompt']['name'].format(text)
-        items = self._parse_layout_options(prompt)
+        prompt = settings.PROMPT_DELETE.format(text)
+        items = [self._indent, (prompt, 5, 'l')]
 
         self.print_line(items, wrap=True)
 
-        input = self.input('', accepted_responses=self.responses_confirm, bool=True, required=True, error_on_empty=False)
+        input = self.input('', accepted_responses=settings.RESPONSES_CONFIRM, bool=True, required=True, error_on_empty=False)
 
         return input
-
-    def add_edit_item(self, fields, book=None):
-        if book:
-            self.print_book_expand(book, new_line_after=True)
-
-        response = {} 
-
-        for field in fields:
-            name = fields[field]['name']
-            check = fields[field]['check']
-            error = fields[field]['error']
-            required = fields[field]['required']
-
-            response[field] = self.input(name, check_response=check, error=error, required=required, exit_on_error=True)
-
-        return response
-
-    def add_edit_book(self, check_fields, book=None):
-        fields = self.fields_add_edit_book.copy()
-
-        for field in fields:
-            fields[field].update(check_fields[field])
-
-        response = self.add_edit_item(fields, book=book)
-
-        return response
-    
-    def add_book(self, check_fields):
-        fields = self.fields_add_edit_book.copy()
-
-        for field in fields:
-            fields[field].update(check_fields[field])
-
-        response = self.add_edit_item(fields)
-
-        return response
-
-    def add_log(self, check_fields, book):
-        fields = self.fields_add_log.copy()
-
-        for field in fields:
-            fields[field].update(check_fields[field])
-
-        response = self.add_edit_item(fields, book=book)
-
-        return response
-
-    def edit_book(self, check_fields, book):
-        fields = self.fields_add_edit_book.copy()
-
-        for field in fields:
-            fields[field].update(check_fields[field])
-
-        response = self.add_edit_item(fields, book=book)
-
-        return response
 
 
 db_path = os.path.abspath(os.path.expanduser(settings.DB_PATH)) if settings.DB_PATH else '.logger.db'
@@ -663,7 +534,7 @@ class DB:
         return and_(Log.date == date, Log.time_start == time_start)
 
     def search(self, query):
-        query = select(Book).where(or_(Book.title.contains(query), Book.author.contains(query)))
+        query = select(Book).where(or_(Book.id.contains(query), Book.title.contains(query), Book.author.contains(query)))
         return session.scalars(query).all()
 
     def book_obj(self, book_id):
@@ -678,22 +549,17 @@ class DB:
         query = select(Book).order_by(Book.title)
         return session.scalars(query).all()
 
-    def update_book(self, book_id, info):
+    def update_book(self, book_id, **info):
         with session_scope() as session:
             query = update(Book).where(Book.id == book_id).values(**info)
             session.execute(query)
 
-    def update_log(self, date, time_start, info):
-        with session_scope() as session:
-            query = update(Log).where(self._log_id(date, time_start)).values(**info)
-            session.execute(query)
-
-    def insert_log(self, info):
+    def insert_log(self, **info):
         with session_scope() as session:
             query = insert(Log).values(**info)
             session.execute(query)
 
-    def insert_book(self, info):
+    def insert_book(self, **info):
         with session_scope() as session:
             query = insert(Book).values(id=self._generate_book_id(), **info)
             session.execute(query)
@@ -740,15 +606,15 @@ def get_item(item_id):
     return
 
 
-def is_valid_book_title(title):
-    if len(title) > settings.LIMIT_BOOK_TITLE_LENGTH:
+def is_valid_title(title):
+    if len(title) > settings.LIMIT_TITLE_LENGTH:
         return False
 
     return title 
 
 
-def is_valid_author_name(name):
-    if len(name) > settings.LIMIT_AUTHOR_NAME_LENGTH:
+def is_valid_author(name):
+    if len(name) > settings.LIMIT_AUTHOR_LENGTH:
         return False
 
     return name
@@ -790,75 +656,138 @@ def is_valid_depth(depth):
         return False
 
 
+def parse_args(fields, args, usage):
+    printer = Printer()
+    args = (*args, *('',) * (len(fields) - len(args)))
+    arg_fields = dict()
+
+    for value, params in zip(args, fields):
+        name, metavar, required, check, error = params.values()
+
+        if not value:
+            if required:
+                printer.print_err_required_field(metavar)
+
+        elif check:
+            res = check(value)
+            if res == False:
+                if error:
+                    printer.print_error(error, exit=True)
+                printer.print_usage_field(usage)
+                sys.exit(1)
+            elif res != True:
+                arg_fields[name] = res
+                continue
+
+        arg_fields[name] = value
+
+    return arg_fields
+
+
 class Add:
     def __init__(self):
         self.db = DB()
         self.printer = Printer()
 
-        self.fields_add_book = {
-            'title': {
+        self.fields_book = [
+            {
+                'name': 'title',
+                'metavar': settings.STR_FIELD_TITLE,
                 'required': False,
-                'check': is_valid_book_title
+                'check': is_valid_title,
+                'error': settings.ERR_INVALID_TITLE
             },
-            'author': {
+            {
+                'name': 'author',
+                'metavar': settings.STR_FIELD_AUTHOR,
                 'required': False,
-                'check': is_valid_author_name
+                'check': is_valid_author,
+                'error': settings.ERR_INVALID_AUTHOR
             }
-        }
-        self.fields_add_log = {
-            'date': {
+        ]
+        self.fields_log = [
+            {
+                'name': 'book_id',
+                'metavar': settings.STR_FIELD_BOOK_ID,
                 'required': True,
-                'check': is_valid_date
+                'check': self.db._is_valid_book_id,
+                'error': settings.ERR_INVALID_BOOK_ID
             },
-            'time': {
+            {
+                'name': 'date',
+                'metavar': settings.STR_FIELD_DATE,
                 'required': True,
-                'check': is_valid_time_span
+                'check': is_valid_date,
+                'error': settings.ERR_INVALID_DATE
             },
-            'pages': {
+            {
+                'name': 'time',
+                'metavar': settings.STR_FIELD_TIME,
+                'required': True,
+                'check': is_valid_time_span,
+                'error': settings.ERR_INVALID_TIME_SPAN
+            },
+            {
+                'name': 'pages',
+                'metavar': settings.STR_FIELD_PAGES,
                 'required': False,
                 'check': is_valid_page_span,
+                'error': settings.ERR_INVALID_PAGE_SPAN
             },
-            'depth': {
+            {
+                'name': 'depth',
+                'metavar': settings.STR_FIELD_DEPTH,
                 'required': False,
                 'check': is_valid_depth,
+                'error': settings.ERR_INVALID_DEPTH
             },
-        }
+        ]
 
     def run(self, args):
-        if args == []:
-            response = self.printer.add_book(self.fields_add_book)
-            self.db.insert_book(response)
+        if len(args) < 1:
+            self.printer.print_usage_field(settings.USAGE_ADD)
+            sys.exit(1)
+        
+        command = args[0]
+        args = args[1:]
+
+        if command == 'book':
+            if not args or len(args) > 2:
+                self.printer.print_usage_field(settings.USAGE_ADD_BOOK)
+                sys.exit(1)
+
+            args = parse_args(self.fields_book, args, settings.USAGE_ADD_BOOK)
+
+            self.db.insert_book(**args)
             self.printer.print_action_add()
 
             return True
 
-        book = get_book(args[0])
+        elif command == 'log':
+            if not args or len(args) > 4:
+                self.printer.print_usage_field(settings.USAGE_ADD_LOG)
+                sys.exit(1)
 
-        if not book:
-            self.printer.print_err_invalid_book_id()
+            args = parse_args(self.fields_log, args, settings.USAGE_ADD_LOG)
 
-        elif len(args) == 1:
-            response  = self.printer.add_log(self.fields_add_log, book)
-            response = {
-                'book_id': book.id, 
-                'date': response['date'], 
-                'time_start': response['time'][0], 
-                'time_end': response['time'][1], 
-                'page_start': response['pages'][0] if response['pages'] else None, 
-                'page_end': response['pages'][1] if response['pages'] else None,
-                'depth': response['depth'], 
+            args = {
+                'book_id': args['book_id'], 
+                'date': args['date'], 
+                'time_start': args['time'][0], 
+                'time_end': args['time'][1], 
+                'page_start': args['pages'][0] if args['pages'] else None, 
+                'page_end': args['pages'][1] if args['pages'] else None,
+                'depth': args['depth'], 
             }
 
-            log_id = (response['date'], response['time_start'])
+            if self.db._is_valid_log_id(args['date'], args['time_start']):
+                self.printer.print_err_log_exists()
 
-            if self.db._is_valid_log_id(*log_id):
-                self.printer.print_err_log_exists(*log_id)
-
-            self.db.insert_log(response)
+            self.db.insert_log(**args)
             self.printer.print_action_add()
 
             return True
-
+        
         return False
 
 
@@ -867,28 +796,38 @@ class Edit:
         self.db = DB()
         self.printer = Printer()
 
-        self.fields = {
-            'title': {
-                'required': False,
-                'check': is_valid_book_title
+        self.fields = [
+            {
+                'name': 'book_id',
+                'metavar': settings.STR_FIELD_BOOK_ID,
+                'required': True,
+                'check': self.db._is_valid_book_id,
+                'error': settings.ERR_INVALID_BOOK_ID
             },
-            'author': {
+            {
+                'name': 'title',
+                'metavar': settings.STR_FIELD_TITLE,
                 'required': False,
-                'check': is_valid_author_name
+                'check': is_valid_title,
+                'error': settings.ERR_INVALID_TITLE
+            },
+            {
+                'name': 'author',
+                'metavar': settings.STR_FIELD_AUTHOR,
+                'required': False,
+                'check': is_valid_author,
+                'error': settings.ERR_INVALID_AUTHOR
             }
-        }
+        ]
 
     def run(self, args):
-        if len(args) != 1:
-            return False
+        if not args or len(args) > 3:
+            self.printer.print_usage_field(settings.USAGE_EDIT)
+            sys.exit(1)
 
-        book = self.db.book_obj(args[0])
+        args = parse_args(self.fields, args, settings.USAGE_EDIT)
 
-        if not book:
-            self.printer.print_err_invalid_book_id()
-
-        response = self.printer.edit_book(self.fields, book)
-        self.db.update_book(book.id, response)
+        self.db.update_book(**args)
         self.printer.print_action_edit()
 
         return True
@@ -901,7 +840,8 @@ class Remove:
 
     def run(self, args):
         if len(args) < 1:
-            return False
+            self.printer.print_usage_field(settings.USAGE_REMOVE)
+            sys.exit(1)
         
         books, logs = set(), set()
 
@@ -909,7 +849,7 @@ class Remove:
             item = get_item(arg)
 
             if not item:
-                self.printer.print_err_invalid_item_id()
+                self.printer.print_err_invalid_item_id(self.printer._truncate(arg, 20))
             
             if isinstance(item, Log):
                 logs.add(item)
@@ -924,8 +864,6 @@ class Remove:
         if confirm:
             self.db.delete_items(logs | books)
 
-        self.printer.print_action_delete(confirm)
-
         return True
 
 
@@ -935,7 +873,11 @@ class Show:
         self.printer = Printer()
 
     def run(self, args):
-        if args == []:
+        if len(args) > 1:
+            self.printer.print_usage_field(settings.USAGE_SHOW)
+            sys.exit(1)
+
+        if not args:
             books = self.db.get_all_books()
             self.printer.print_all_books(books)
 
@@ -946,7 +888,7 @@ class Show:
         if not book:
             self.printer.print_err_invalid_book_id()
         
-        if len(args) == 1 and book:
+        if len(args) == 1:
             self.printer.print_book_info(book)
 
             return True
@@ -990,7 +932,8 @@ def main():
     try:
         command = commands[sys.argv[1]]
     except KeyError:
-        printer.print_err_invalid_command(list(commands))
+        printer.print_usage()
+        sys.exit(1)
 
     if not command().run(args):
         printer.print_usage()
