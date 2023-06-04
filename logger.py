@@ -50,10 +50,9 @@ class Printer:
     def __init__(self):
         self.width = self._find_apt_value(settings.WIDTH, os.get_terminal_size().columns)
         self.columns = self._find_apt_value(settings.COLUMNS.copy(), self.width)
-
-        self._indent = ('', 1, 'l')
-        self._gutter = ' ' * settings.GUTTER
-        self._margin = ' ' * settings.MARGIN
+        self.indent = ('', 1, 'l')
+        self.gutter = ' ' * settings.GUTTER
+        self.margin = ' ' * settings.MARGIN
 
     def _parse_layout_options(self, options, locals=None):
         layout = []
@@ -72,18 +71,21 @@ class Printer:
   
     def _find_apt_value(self, items, value):
         apt_value = items.get('default')
+
         for item in items:
             if item != 'default' and value >= item:
                 apt_value = items[item]
+
         return apt_value
 
     def _truncate(self, string, width, align=None):
         if len(string) > width:
-            string = f'{string[:width-2].strip()}..'
+            string = f'{string[:width-3].strip()}...'
             if align and align == 'l':
                 return string.ljust(width)
             if align and align == 'r':
                 return string.rjust(width)
+
         return string
 
     def _format_item(self, string, width, align, wrap):
@@ -100,15 +102,15 @@ class Printer:
 
         for string in strings:
             if align == 'l':
-                items.append((string.ljust(width), width, align))
+                string = string.ljust(width)
             if align == 'r':
-                items.append((string.rjust(width), width, align))
+                string = string.rjust(width)
+            items.append((string, width, align))
 
         return items
 
     def _format_line(self, items, wrap=False, full_just=False, background_color='', foreground_color=''):
         current_index = 0
-
         formatted_items = []
 
         for string, span, align in items:
@@ -141,7 +143,7 @@ class Printer:
             line_strings.append(line_fields)
 
         for i, line_string in enumerate(line_strings):
-            line_string = self._margin + self._gutter.join(line_string)
+            line_string = self.margin + self.gutter.join(line_string)
 
             if full_just:
                 line_string = line_string.ljust(self.width)
@@ -188,7 +190,6 @@ class Printer:
 
     def print_item_count(self, book_count=None, log_count=None, page_count=None, hour_count=None, **kwargs):
         fields = []
-
         log_count_string = self._format_count_log(log_count)
         book_count_string = self._format_count_book(book_count)
         page_count_string = self._format_count_page(page_count)
@@ -207,27 +208,27 @@ class Printer:
             fields.append(hour_count_string)
 
         string = ', '.join(fields)
-        items = [self._indent, (string, 5, 'l')]
+        items = [self.indent, (string, 5, 'l')]
         self.print_line(items, **kwargs)
 
-    def print_header(self, header):
-        items = [self._indent, (header, 5, 'l')]
-        self.print_line(items, new_line_after=True)
-
     def print_field(self, name, value):
-        items = [self._indent, (name, 1, 'r'), (value, 4, 'l')] 
+        items = [self.indent, (name, 1, 'r'), (value, 4, 'l')] 
         self.print_line(items, wrap=True)
 
     def print_action(self, action, **kwargs):
-        items = [self._indent, (action, 5, 'l')]
+        items = [self.indent, (action, 5, 'l')]
         self.print_line(items, **kwargs)
 
     def print_error(self, error, exit=False, **kwargs):
-        items = [self._indent, (error, 5, 'l')]
+        items = [self.indent, (error, 5, 'l')]
         self.print_line(items, wrap=True, print_method=logging.error, **kwargs)
 
         if exit:
             sys.exit(1)
+
+    def print_usage(self, usage):
+        self.print_field(settings.STR_FIELD_USAGE, usage)
+        sys.exit(1)
 
     def print_table_headers(self, headers, **kwargs):
         items = self._parse_layout_options(headers)
@@ -246,9 +247,7 @@ class Printer:
             author = book.author
             log_count = len(book.logs) if book.logs else ''
             title = book.title if book.title else ''
-
             total_log_count += len(book.logs)
-
             items = self._parse_layout_options(headers, locals=locals())
 
             if settings.ENABLE_COLOR and highlight:
@@ -304,10 +303,7 @@ class Printer:
         if new_line_after:
             self.print_empty_line()
     
-    def print_books(self, books, empty_message, header=None):
-        if header:
-            self.print_header(header)
-
+    def print_books(self, books, empty_message):
         if not books:
             self.print_error(empty_message)
         else:
@@ -319,7 +315,7 @@ class Printer:
         author = settings.STR_NO_AUTHOR if not book.author else book.author
 
         row1_items = [(id, 1, 'l'), (title, 5, 'l')]
-        row2_items = [self._indent, (author, 5, 'l')]
+        row2_items = [self.indent, (author, 5, 'l')]
 
         if new_line_before:
             self.print_empty_line()
@@ -355,75 +351,32 @@ class Printer:
             self.print_book_expand(book, new_line_after=True)
             self.print_item_count(log_count=len(book.logs), page_count=page_count, hour_count=hour_count)
 
-    def input(self, name, accepted_responses={}, required=False, check_response=None, error='', bool=False, exit_on_error=False, error_on_empty=True):
-        fields = [self._indent, (name, 1, 'r')]
-        line = self._format_line(fields)
-        response = input(f'{line[0]}{self._gutter}').strip()
-
-        if not response and required:
-            if error_on_empty:
-                error = settings.ERR_REQUIRED_FIELD.format(name)
-
-        elif not response and not required:
-            return
-
-        elif accepted_responses and response.lower() in accepted_responses:
-            if bool:
-                return True
-            return response
-
-        elif check_response:
-            response = check_response(response)
-            if response is not False:
-                if bool:
-                    return True
-                return response
-
-        if error:
-            self.print_error(error, new_line_before=True)
-
-        if exit_on_error:
-            sys.exit(1)
-
-        if bool:
-            return False
-
-        return response
-
     def confirm_delete(self, books, logs):
-        book_title = ''
-
-        if books:
-            book = next(iter(books))
-            if book.title:
-                book_title = self._truncate(book.title, settings.LIMIT_PROMPT_DELETE_TITLE_LENGTH)
-
+        input_field = ''.join(self._format_line([self.indent, ('', 1, 'l')]) + [self.gutter])
         log_count = self._format_count_log(len(logs))
         book_count = self._format_count_book(len(books))
-        text = ''
 
-        if len(books) == 1:
-            if book_title:
-                if logs:
-                    text += f'\"{book_title}\" and {log_count}'
-                else:
-                    text += f'\"{book_title}\"'
-        else:
-            if books and logs:
-                text += f'{book_count} and {log_count}'
-            elif not books:
-                text = log_count
-            elif not logs:
+        if books:
+            if len(books) == 1:
+                book = next(iter(books))
+                if book.title:
+                    book_title = self._truncate(book.title, settings.LIMIT_PROMPT_DELETE_TITLE_LENGTH)
+                    text = f'\"{book_title}\"'
+            else:
                 text = book_count
+            if logs:
+                text += f' and {log_count}'
+        else:
+            text = log_count
 
         prompt = settings.PROMPT_DELETE.format(text)
-        items = [self._indent, (prompt, 5, 'l')]
+        items = [self.indent, (prompt, 5, 'l')]
 
         self.print_line(items, wrap=True)
 
-        input = self.input('', accepted_responses=settings.RESPONSES_CONFIRM, bool=True, required=True, error_on_empty=False)
+        confirm = input(input_field)
 
-        return input
+        return confirm in settings.RESPONSES_CONFIRM
 
 
 db_path = os.path.abspath(os.path.expanduser(settings.DB_PATH)) if settings.DB_PATH else '.logger.db'
@@ -693,9 +646,7 @@ class Add:
             args = parse_args(self.fields_book, args, settings.USAGE_ADD_BOOK)
 
             self.db.insert_book(**args)
-            self.printer.print_action_add()
-
-            return
+            self.printer.print_action(settings.ACTION_ADD)
 
         elif command == 'log':
             if not args or len(args) > 4:
@@ -719,9 +670,8 @@ class Add:
             self.db.insert_log(**args)
             self.printer.print_action(settings.ACTION_ADD)
 
-            return
-        
-        self.printer.print_usage(settings.USAGE_ADD)
+        else:
+            self.printer.print_usage(settings.USAGE_ADD)
 
 
 class Edit:
@@ -762,8 +712,6 @@ class Edit:
         self.db.update_book(**args)
         self.printer.print_action(settings.ACTION_EDIT)
 
-        return
-
 
 class Remove:
     def __init__(self):
@@ -797,8 +745,6 @@ class Remove:
         
         self.printer.print_action(settings.ACTION_DELETE[confirm], new_line_before=True)
 
-        return
-
 
 class Show:
     def __init__(self):
@@ -809,21 +755,18 @@ class Show:
         if len(args) > 1:
             self.printer.print_usage(settings.USAGE_SHOW)
 
-        if not args:
+        if args:
+            book = self.db.book_obj(args[0])
+
+            if not book:
+                self.printer.print_error(settings.ERR_INVALID_BOOK_ID, exit=True)
+        
+            if len(args) == 1:
+                self.printer.print_book_info(book)
+
+        else:
             books = self.db.get_all_books()
             self.printer.print_books(books, settings.MSG_NO_BOOKS)
-
-            return
-
-        book = self.db.book_obj(args[0])
-
-        if not book:
-            self.printer.print_error(settings.ERR_INVALID_BOOK_ID, exit=True)
-        
-        if len(args) == 1:
-            self.printer.print_book_info(book)
-
-            return
 
 
 class Search:
@@ -838,9 +781,8 @@ class Search:
 
             self.printer.print_books(results, settings.MSG_NO_RESULTS)
 
-            return
-
-        self.printer.print_usage(settings.USAGE_SEARCH)
+        else:
+            self.printer.print_usage(settings.USAGE_SEARCH)
 
 
 def main():

@@ -10,6 +10,9 @@ WIDTH = {
     'default': 58,
 }
 
+RESPONSES_CONFIRM = {'yes', 'y'}
+PROMPT_DELETE = 'Delete {}?'
+
 LIMIT_TITLE_LENGTH = 80
 LIMIT_AUTHOR_LENGTH = 30
 LIMIT_PROMPT_DELETE_TITLE_LENGTH = 30
@@ -27,8 +30,6 @@ STR_HOUR_SINGULAR = 'hour'
 STR_HOUR_PLURAL = 'hours'
 STR_PAGE_SINGULAR = 'page'
 STR_PAGE_PLURAL = 'pages'
-STR_MINUTE_SINGULAR = 'minute'
-STR_MINUTE_PLURAL = 'minutes'
 STR_NO_TITLE = 'Unknown Book'
 STR_NO_AUTHOR = 'Unknown Author'
 
@@ -55,7 +56,6 @@ ERR_INVALID_DATE = ERR_FORMAT.format('Date', 'YYYY-MM-DD')
 ERR_INVALID_TIME_SPAN = ERR_FORMAT.format('Time', 'H:M-H:M')
 ERR_INVALID_PAGE_SPAN = ERR_FORMAT.format('Pages', 'P-P')
 ERR_INVALID_DEPTH = '\"Depth\" must be numerical'
-
 
 MSG_NO_BOOKS = 'No Books'
 MSG_NO_LOGS = 'No Logs'
@@ -127,7 +127,3 @@ HEADERS_TABLE_LOG = {
         'align': 'r', 
     }, 
 }
-
-RESPONSES_CONFIRM = {'yes', 'y'}
-
-PROMPT_DELETE = 'Delete {}?'
